@@ -1,0 +1,20 @@
+{
+  "name": "astroparty",
+  "private": true,
+  "version": "1.0.0",
+  "license": "MIT",
+  "scripts": {
+    "frontend:start": "cd packages/frontend && yarn dev",
+    "frontend:build": "cd packages/frontend && yarn build",
+    "backend:start": "cd packages/backend && yarn start:dev",
+    "backend:start:prod": "cd packages/backend && yarn build && yarn start:prod",
+    "shared:build": "cd packages/shared && yarn build"
+  },
+  "devDependencies": {
+    "lerna": "^5.1.4",
+    "prettier": "^3.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^4.2.1"
+  }
+}

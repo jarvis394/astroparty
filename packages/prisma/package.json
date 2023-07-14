@@ -1,0 +1,14 @@
+{
+  "name": "@astroparty/prisma",
+  "version": "1.0.0",
+  "main": "node_modules/.prisma/client/index.js",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@prisma/client": "^5.0.0",
+    "prisma": "^5.0.0"
+  },
+  "scripts": {
+    "prisma:migrate": "prisma migrate dev"
+  }
+}
