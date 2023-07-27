@@ -1,27 +1,32 @@
-import React, { useEffect, useState } from 'react'
-import { Engine, Events, Render, Runner, World } from 'matter-js'
-import { useMatter } from 'src/components/MatterEngine'
-import Ship from '../Ship'
+import { Assets } from 'pixi.js'
+import React, { useRef } from 'react'
+import Engine from 'src/engine/Engine'
+import Application from 'src/pixi/Application'
+import ScenesController from 'src/pixi/ScenesController'
+import { SCENES } from 'src/pixi/scenes'
+import shipBlueSprite from 'src/assets/ship.png'
+import Matter from 'matter-js'
 import useScreenDimensions from 'src/hooks/useScreenDimensions'
-import { useApp } from '@pixi/react'
-import Walls from '../Walls'
+import useMountEffect from 'src/hooks/useMountEffect'
+
+const PIXI_CANVAS_CONTAINER_ID = 'pixi-container'
 
 const App: React.FC = () => {
-  const app = useApp()
   const screenDimensions = useScreenDimensions()
-  const { engine, runner } = useMatter()
-  const [, update] = useState(0)
+  const canvasContainer = useRef<HTMLDivElement>(null)
+  const engine = useRef(new Engine())
   const render = React.useMemo(
     () =>
-      Render.create({
+      Matter.Render.create({
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         element: document.getElementById('matterjs-root')!,
-        engine: engine,
+        engine: engine.current.matterEngine,
         options: {
           width: screenDimensions.width,
           height: screenDimensions.height,
           background: 'transparent',
           wireframeBackground: 'transparent',
+          wireframes: true,
           showStats: true,
           showAngleIndicator: true,
           showBounds: true,
@@ -29,40 +34,35 @@ const App: React.FC = () => {
           showVelocity: true,
         },
       }),
-    [engine, screenDimensions.height, screenDimensions.width]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
-  useEffect(() => {
-    Runner.run(runner, engine)
+  useMountEffect(() => {
+    const app = new Application(canvasContainer.current)
+    const scenesController = new ScenesController(app, engine.current)
 
-    Events.on(runner, 'tick', () => {
-      update((prev) => (prev + 1) % 2)
-    })
+    const start = async () => {
+      Matter.Render.run(render)
+      Assets.add('ship_blue', shipBlueSprite)
+      await Assets.load('ship_blue')
+      engine.current.addPlayer()
+      engine.current.start()
+      scenesController.loadScene(SCENES.MainScene)
+      app.start()
+    }
 
-    Render.run(render)
-    app.start()
+    start()
 
     return () => {
-      World.clear(engine.world, false)
-      Engine.clear(engine)
-      Runner.stop(runner)
-      render.canvas.remove()
+      // Ссылка на движок никогда изменится
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      engine.current.destroy()
+      app.destroy()
     }
-  }, [
-    app,
-    engine,
-    render,
-    runner,
-    screenDimensions.height,
-    screenDimensions.width,
-  ])
+  })
 
-  return (
-    <>
-      <Walls />
-      <Ship />
-    </>
-  )
+  return <div id={PIXI_CANVAS_CONTAINER_ID} ref={canvasContainer} />
 }
 
 export default App

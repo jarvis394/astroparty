@@ -2737,6 +2737,11 @@
   resolved "https://registry.yarnpkg.com/@types/json-schema/-/json-schema-7.0.12.tgz#d70faba7039d5fca54c83c7dbab41051d2b6f6cb"
   integrity sha512-Hr5Jfhc9eYOQNPYO5WLDq/n4jqijdHNlDXjuAQkkt+mWdQR+XJToOHrsD4cPaMXpn6KO7y2+wM8AZEs8VpBLVA==
 
+"@types/mainloop.js@^1.0.5":
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/@types/mainloop.js/-/mainloop.js-1.0.5.tgz#86db93e50852566bf384c3c866a31bb19aca8118"
+  integrity sha512-AYDlcqJYi90NCz/049HKTP7rB0yat+hDAE3QTepHsi4A+9dER8QD5L9v5+basUSNxGosit8H5eDxWE4M44yHpg==
+
 "@types/matter-js@^0.18.5":
   version "0.18.5"
   resolved "https://registry.yarnpkg.com/@types/matter-js/-/matter-js-0.18.5.tgz#61eec5ffdd0b45e7ef3e5b3a2db48bebea31d50b"
@@ -5790,6 +5795,11 @@ humanize-ms@^1.2.1:
   dependencies:
     ms "^2.0.0"
 
+husky@^8.0.3:
+  version "8.0.3"
+  resolved "https://registry.yarnpkg.com/husky/-/husky-8.0.3.tgz#4936d7212e46d1dea28fef29bb3a108872cd9184"
+  integrity sha512-+dQSyqPh4x1hlO1swXBiNb2HzTDN1I2IGLQx1GrBuiqFJfoMrnZWwVmatvSiO+Iz8fBUnf+lekwNo4c2LlXItg==
+
 iconv-lite@0.4.24, iconv-lite@^0.4.24:
   version "0.4.24"
   resolved "https://registry.yarnpkg.com/iconv-lite/-/iconv-lite-0.4.24.tgz#2022b4b25fbddc21d2f524974a474aafe733908b"
@@ -7015,6 +7025,11 @@ magic-string@0.30.0:
   dependencies:
     "@jridgewell/sourcemap-codec" "^1.4.13"
 
+mainloop.js@^1.0.4:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/mainloop.js/-/mainloop.js-1.0.4.tgz#4cc3f1e7a57e4a718de397884a59063c42913e87"
+  integrity sha512-zAyzCCwJcSDv777sGZTnDaXQdZs8POeysoI5YcSJaFKRVTnFRUQFlnV2B1Wn8N5KRygMOyKCr6cOerAnItkY3A==
+
 make-dir@^2.1.0:
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/make-dir/-/make-dir-2.1.0.tgz#5f0310e18b8be898cc07009295a30ae41e91e6f5"
@@ -8136,6 +8151,13 @@ pkg-dir@^4.2.0:
   dependencies:
     find-up "^4.0.0"
 
+planck-js@^0.3.31:
+  version "0.3.31"
+  resolved "https://registry.yarnpkg.com/planck-js/-/planck-js-0.3.31.tgz#dc87a999f6d425633d7abd8c77078fcb5a9babd2"
+  integrity sha512-fwKYnL92pF2nXdMPeBq/Aipu+m8LztcEcNjdcrQm/sWKDR01Ej0g121KS1oO7NW23WnRzxw24a7V4KI2JlFpSg==
+  dependencies:
+    stage-js "^0.9.4"
+
 pluralize@8.0.0:
   version "8.0.0"
   resolved "https://registry.yarnpkg.com/pluralize/-/pluralize-8.0.0.tgz#1a6fa16a38d12a1901e0320fa017051c539ce3b1"
@@ -9006,6 +9028,16 @@ stack-utils@^2.0.3:
   integrity sha512-XlkWvfIm6RmsWtNJx+uqtKLS8eqFbxUg0ZzLXqY0caEy9l7hruX8IpiDnjsLavoBgqCCR71TqWO8MaXYheJ3RQ==
   dependencies:
     escape-string-regexp "^2.0.0"
+
+stage-js@^0.9.4:
+  version "0.9.4"
+  resolved "https://registry.yarnpkg.com/stage-js/-/stage-js-0.9.4.tgz#5d31eb8f33f1ca8d21c2043c6d21e47794b715f5"
+  integrity sha512-fNN6rkYD55T4NUxJE71hixXYS9DoyHVX5S8sQcq5yiozX1kqHP/wnByZwFfdAGNZjb5rROJ90zwb0EbM9U2Jqg==
+
+stage-js@^0.9.5:
+  version "0.9.5"
+  resolved "https://registry.yarnpkg.com/stage-js/-/stage-js-0.9.5.tgz#b910bf55798ebf9b4fc42d0def14fda4fc069819"
+  integrity sha512-pSu6U+e7+CPUi9jB56RVy7ni7JQQZGVzwcdel5RZhG0Rjzv3uWkhDHSm6Uk9DI4B1Yrfva7uylFq41Pbb1BfUA==
 
 statuses@2.0.1:
   version "2.0.1"

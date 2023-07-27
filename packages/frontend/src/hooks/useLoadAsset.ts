@@ -3,7 +3,7 @@ import { Assets, Cache, ProgressCallback } from 'pixi.js'
 
 const useLoadAsset = <T>(
   key: string,
-  onProgress?: ProgressCallback,
+  onProgress?: ProgressCallback
 ): T | undefined => {
   const [asset, setAsset] = useState<T>()
 

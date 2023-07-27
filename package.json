@@ -8,12 +8,16 @@
     "frontend:build": "cd packages/frontend && yarn build",
     "backend:start": "cd packages/backend && yarn start:dev",
     "backend:start:prod": "cd packages/backend && yarn build && yarn start:prod",
-    "shared:build": "cd packages/shared && yarn build"
+    "shared:build": "cd packages/shared && yarn build",
+    "lint": "yarn lerna run lint",
+    "lint:fix": "yarn lerna run lint:fix",
+    "prepare": "husky install"
   },
   "devDependencies": {
+    "eslint": "^8.44.0",
+    "husky": "^8.0.3",
     "lerna": "^5.1.4",
-    "prettier": "^3.0.0",
-    "eslint": "^8.44.0"
+    "prettier": "^3.0.0"
   },
   "dependencies": {
     "@prisma/client": "^4.2.1"

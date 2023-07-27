@@ -1,21 +1,28 @@
 {
-	"compilerOptions": {
-		"target": "es2017",
-		"useDefineForClassFields": true,
-		"allowJs": false,
-		"skipLibCheck": true,
-		"esModuleInterop": false,
-		"allowSyntheticDefaultImports": true,
-		"strict": true,
-		"forceConsistentCasingInFileNames": true,
-		"module": "commonjs",
-		"moduleResolution": "Node",
-		"resolveJsonModule": true,
-		"isolatedModules": true,
-		"emitDecoratorMetadata": true,
-		"experimentalDecorators": true,
-		"strictPropertyInitialization": false,
-		"outDir": "./dist"
-	},
-	"include": ["./*.ts"]
+  "compilerOptions": {
+    "baseUrl": ".",
+    "allowJs": false,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "sourceMap": true,
+    "lib": ["ESNext"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": ".",
+    "paths": {
+      "src/*": ["./src/*"]
+    },
+    "preserveSymlinks": true,
+    "removeComments": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2016",
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "./dist",
+    "composite": true
+  }
 }
