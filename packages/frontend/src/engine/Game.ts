@@ -43,7 +43,7 @@ class Game {
   }
 
   public update(delta: number) {
-    const interpolation = delta / Loop.getSimulationTimestep()
+    const interpolation = delta / (1000 / Loop.getFPS())
 
     for (const player of this.getAllPlayersIterator()) {
       player.update(interpolation)

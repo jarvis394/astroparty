@@ -3,7 +3,8 @@ import Matter from 'matter-js'
 import Loop from 'mainloop.js'
 
 class Engine {
-  static BASE_DELTA = 1000 / 60
+  static BASE_FPS = 60
+  static BASE_DELTA = 1000 / Engine.BASE_FPS
 
   game: Game
   matterEngine: Matter.Engine
@@ -23,13 +24,14 @@ class Engine {
   }
 
   public update(delta: number) {
-    const baseDelta = Loop.getSimulationTimestep()
-    Matter.Engine.update(this.matterEngine, baseDelta * (delta / baseDelta))
+    Matter.Engine.update(this.matterEngine, delta)
     this.game.update(delta)
   }
 
   public start() {
-    Loop.setSimulationTimestep(Engine.BASE_DELTA)
+    const fps = Loop.getFPS()
+    const delta = fps > Engine.BASE_FPS ? 1000 / fps : Engine.BASE_DELTA
+    Loop.setSimulationTimestep(delta)
     Loop.setUpdate(this.update.bind(this)).start()
   }
 

@@ -49,23 +49,15 @@ class Player extends PIXI.Sprite {
     const position = this.enginePlayer.body.position
     const angle = this.enginePlayer.body.angle
     const lerpPosition: Matter.Vector = {
-      x: lerp(
-        this.position.x,
-        position.x,
-        0.3 * this.enginePlayer.interpolation
-      ),
-      y: lerp(
-        this.position.y,
-        position.y,
-        0.3 * this.enginePlayer.interpolation
-      ),
+      x: lerp(this.position.x, position.x, 0.3),
+      y: lerp(this.position.y, position.y, 0.3),
     }
 
-    this.position.set(lerpPosition.x, lerpPosition.y)
+    this.position.set(position.x, position.y)
     this.rotation = lerp(
       this.rotation,
       angle + degreesToRadian(Player.SPRITE_ANGLE_CORRECTION),
-      0.2 * this.enginePlayer.interpolation
+      this.enginePlayer.isDashing ? 0.2 : 1
     )
   }
 }

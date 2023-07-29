@@ -49,7 +49,7 @@ const App: React.FC = () => {
       engine.current.addPlayer()
       engine.current.start()
       scenesController.loadScene(SCENES.MainScene)
-      app.start()
+      // app.start()
     }
 
     start()

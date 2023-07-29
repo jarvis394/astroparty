@@ -1,14 +1,14 @@
 import World from './World'
 import Matter from 'matter-js'
-import { degreesToRadian, lerp } from '@astroparty/shared/utils'
+import { degreesToRadian } from '@astroparty/shared/utils'
 
 const PLAYER_HITBOX_RADIUS = 20
-const PLAYER_VELOCITY = 5
+const PLAYER_VELOCITY = 4
 const PLAYER_ROTATE_ANGLE = 6
 const DASH_ROTATE_ANGLE = 60
-const DASH_TIMEOUT = 200
-const DASH_VELOCITY = PLAYER_VELOCITY * 2
-const PLAYER_VELOCITY_FORCE = 0.001
+const DASH_TIMEOUT = 300
+const DASH_VELOCITY = PLAYER_VELOCITY * 6
+const PLAYER_VELOCITY_FORCE = 0.0005
 
 const getAngleVector = (body: Matter.Body): Matter.Vector => {
   return Matter.Vector.create(Math.cos(body.angle), Math.sin(body.angle))
@@ -81,25 +81,29 @@ class Player {
       this.dashHasBoostedFlag = true
       Matter.Body.setVelocity(
         this.body,
-        Matter.Vector.mult(
-          getAngleVector(this.body),
-          DASH_VELOCITY / this.interpolation
-        )
+        Matter.Vector.mult(getAngleVector(this.body), DASH_VELOCITY)
       )
     }
 
-    const velocityVector = Matter.Vector.mult(
-      getAngleVector(this.body),
-      PLAYER_VELOCITY * this.interpolation
-    )
-    Matter.Body.setVelocity(this.body, {
-      x: lerp(this.body.velocity.x, velocityVector.x, 0.1),
-      y: lerp(this.body.velocity.y, velocityVector.y, 0.1),
+    // const velocityVector = Matter.Vector.mult(
+    //   getAngleVector(this.body),
+    //   PLAYER_VELOCITY * this.interpolation
+    // )
+    // Matter.Body.setVelocity(this.body, {
+    //   x: lerp(this.body.velocity.x, velocityVector.x, 0.6 * this.interpolation),
+    //   y: lerp(this.body.velocity.y, velocityVector.y, 0.6 * this.interpolation),
+    // })
+
+    Matter.Body.set(this.body, {
+      frictionAir: 0.7,
     })
 
     // Перестаём воздействовать на скорость, когда она уравнялась к максимальной скорости игрока
     if (this.body.speed <= PLAYER_VELOCITY) {
       this.isDashing = false
+      Matter.Body.set(this.body, {
+        frictionAir: 0.01,
+      })
     }
   }
 
