@@ -1,74 +1,135 @@
 import Matter from 'matter-js'
+import Bullet from './Bullet'
+import Player from './Player'
+import { EventEmitter, Listener } from 'events'
+
+export enum WorldEvents {
+  BULLET_SPAWN = 'bullet_spawn',
+  BULLET_DESTROYED = 'bullet_destroyed',
+}
 
 class World {
-  public static WORLD_HEIGHT = 1024.0
-  public static WORLD_WIDTH = 1024.0
-  private static WALL_HEIGHT = 10.0
+  public static WORLD_HEIGHT = 1024 / 2
+  public static WORLD_WIDTH = 1024
+  private static WALL_HEIGHT = 50
+  private static WALL_PREFIX = 'wall'
 
   instance: Matter.World
   walls: Matter.Body[]
+  bullets: Map<string, Bullet> = new Map()
+  players: Map<string, Player> = new Map()
+  // TODO: убрать, юзать айдишники из бд
+  /** Используется для вычисления ID новой пульки при её создании */
+  bulletsShot = 0
+  private eventEmitter = new EventEmitter()
 
   constructor({ matterEngine }: { matterEngine: Matter.Engine }) {
     this.instance = matterEngine.world
     this.walls = this.addWorldWalls()
+
+    Matter.Events.on(matterEngine, 'collisionStart', (event) => {
+      for (const { bodyA, bodyB } of event.pairs) {
+        const [a, b] = [bodyA, bodyB].sort((a) => (Bullet.isBullet(a) ? -1 : 1))
+        const bulletId = Bullet.getIdFromLabel(a.label)
+        const playerId = Player.getIdFromLabel(b.label)
+        const player = this.players.get(playerId)
+
+        if (
+          Player.isPlayer(b) &&
+          player?.isOpponent &&
+          this.bullets.has(bulletId) &&
+          player
+        ) {
+          Matter.World.remove(this.instance, a)
+          this.eventEmitter.emit(WorldEvents.BULLET_DESTROYED, bulletId)
+          player.makeCraftDestroyed()
+          return this.bullets.delete(bulletId)
+        }
+
+        if (this.bullets.has(bulletId) && b.label === World.WALL_PREFIX) {
+          Matter.World.remove(this.instance, a)
+          this.eventEmitter.emit(WorldEvents.BULLET_DESTROYED, bulletId)
+          return this.bullets.delete(bulletId)
+        }
+      }
+    })
+  }
+
+  public addEventListener(type: string | number, listener: Listener) {
+    this.eventEmitter.addListener(type, listener)
+  }
+
+  public removeEventListener(type: string | number, listener: Listener) {
+    this.eventEmitter.removeListener(type, listener)
+  }
+
+  public addBullet(bullet: Bullet) {
+    this.bulletsShot += 1
+    this.bullets.set(bullet.id, bullet)
+    Matter.World.addBody(this.instance, bullet.body)
+    this.eventEmitter.emit(WorldEvents.BULLET_SPAWN, bullet.id)
+  }
+
+  public getAllBulletsIterator(): IterableIterator<Bullet> {
+    return this.bullets.values()
+  }
+
+  public createPlayer(): Player {
+    const spawnPositions = [
+      Matter.Vector.create(100, 100),
+      Matter.Vector.create(World.WORLD_WIDTH - 100, World.WORLD_HEIGHT - 100),
+      Matter.Vector.create(World.WORLD_WIDTH - 100, 100),
+      Matter.Vector.create(100, World.WORLD_HEIGHT - 100),
+    ]
+
+    return new Player(
+      (this.players.size + 1).toString(),
+      spawnPositions[this.players.size % spawnPositions.length],
+      this
+    )
+  }
+
+  public addPlayer(player: Player) {
+    this.players.set(player.id, player)
+  }
+
+  public getPlayerByID(id: string) {
+    return this.players.get(id)
+  }
+
+  public doesPlayerExistByID(id: string) {
+    return this.players.has(id)
+  }
+
+  public getAllPlayersIterator(): IterableIterator<Player> {
+    return this.players.values()
+  }
+
+  public update(interpolation: number) {
+    this.bullets.forEach((bullet) => {
+      bullet.update(interpolation)
+    })
   }
 
   private addWorldWalls(): Matter.Body[] {
-    // const bodies: planck.Body[] = []
-    // const wallDefs = [
-    //   {
-    //     position: planck.Vec2(World.WORLD_WIDTH / 2, -World.WALL_HEIGHT / 2),
-    //     dimensions: { hx: World.WORLD_WIDTH, hy: World.WALL_HEIGHT },
-    //   },
-    //   {
-    //     position: planck.Vec2(
-    //       World.WORLD_WIDTH / 2,
-    //       World.WORLD_HEIGHT + World.WALL_HEIGHT / 2
-    //     ),
-    //     dimensions: { hx: World.WORLD_WIDTH, hy: World.WALL_HEIGHT },
-    //   },
-    //   {
-    //     position: planck.Vec2(
-    //       World.WORLD_WIDTH + World.WALL_HEIGHT / 2,
-    //       World.WORLD_HEIGHT / 2
-    //     ),
-    //     dimensions: { hx: World.WALL_HEIGHT, hy: World.WORLD_HEIGHT },
-    //   },
-    //   {
-    //     position: planck.Vec2(-World.WALL_HEIGHT / 2, World.WORLD_HEIGHT / 2),
-    //     dimensions: { hx: World.WALL_HEIGHT, hy: World.WORLD_HEIGHT },
-    //   },
-    // ]
-
-    // for (const wallDef of wallDefs) {
-    //   const wallBody = this.instance.createBody({
-    //     position: wallDef.position,
-    //     type: 'static',
-    //   })
-    //   const wallBox = planck.Box(
-    //     wallDef.dimensions.hx,
-    //     wallDef.dimensions.hy,
-    //     wallDef.position
-    //   )
-    //   wallBody.createFixture(wallBox, 0.0)
-    //   bodies.push(wallBody)
-    // }
-
     const wallOptions: Matter.IChamferableBodyDefinition = {
       isStatic: true,
       friction: 0,
       restitution: 0,
       mass: 0,
+      label: World.WALL_PREFIX,
     }
 
     const bodies = [
+      // Top
       Matter.Bodies.rectangle(
-        World.WORLD_HEIGHT / 2,
+        World.WORLD_WIDTH / 2,
         -World.WALL_HEIGHT / 2,
         World.WORLD_WIDTH,
         World.WALL_HEIGHT,
         wallOptions
       ),
+      // Left
       Matter.Bodies.rectangle(
         -World.WALL_HEIGHT / 2,
         World.WORLD_HEIGHT / 2,
@@ -76,6 +137,7 @@ class World {
         World.WORLD_HEIGHT,
         wallOptions
       ),
+      // Bottom
       Matter.Bodies.rectangle(
         World.WORLD_WIDTH / 2,
         World.WORLD_HEIGHT + World.WALL_HEIGHT / 2,
@@ -83,6 +145,7 @@ class World {
         World.WALL_HEIGHT,
         wallOptions
       ),
+      // Right
       Matter.Bodies.rectangle(
         World.WORLD_WIDTH + World.WALL_HEIGHT / 2,
         World.WORLD_HEIGHT / 2,

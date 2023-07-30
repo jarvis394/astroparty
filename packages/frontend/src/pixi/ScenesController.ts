@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js'
 import PIXIObject from 'src/pixi/PIXIObject'
 import Application from './Application'
 import Engine from 'src/engine/Engine'
+import MainLoop from 'mainloop.js'
 
 export default class ScenesController extends PIXI.Container {
   activeScene?: PIXIObject
@@ -13,7 +14,10 @@ export default class ScenesController extends PIXI.Container {
     app.stage.addChild(this)
     this.app = app
     this.engine = engine
-    this.update()
+
+    MainLoop.setDraw((interpolation) => {
+      this.activeScene?.update(interpolation)
+    })
   }
 
   loadScene(SceneConstructor: typeof PIXIObject) {
@@ -25,12 +29,5 @@ export default class ScenesController extends PIXI.Container {
     this.activeScene = newScene
     this.addChild(newScene)
     newScene.init()
-  }
-
-  update() {
-    if (this.activeScene) {
-      this.activeScene.update()
-    }
-    requestAnimationFrame(() => this.update())
   }
 }

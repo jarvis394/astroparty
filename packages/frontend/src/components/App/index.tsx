@@ -5,6 +5,7 @@ import Application from 'src/pixi/Application'
 import ScenesController from 'src/pixi/ScenesController'
 import { SCENES } from 'src/pixi/scenes'
 import shipBlueSprite from 'src/assets/ship.png'
+import bulletSprite from 'src/assets/bullet.png'
 import Matter from 'matter-js'
 import useScreenDimensions from 'src/hooks/useScreenDimensions'
 import useMountEffect from 'src/hooks/useMountEffect'
@@ -45,11 +46,13 @@ const App: React.FC = () => {
     const start = async () => {
       Matter.Render.run(render)
       Assets.add('ship_blue', shipBlueSprite)
-      await Assets.load('ship_blue')
+      Assets.add('bullet', bulletSprite)
+      await Assets.load(['ship_blue', 'bullet'])
+      const me = engine.current.addPlayer()
+      engine.current.game.setMe(me)
       engine.current.addPlayer()
       engine.current.start()
       scenesController.loadScene(SCENES.MainScene)
-      app.start()
     }
 
     start()

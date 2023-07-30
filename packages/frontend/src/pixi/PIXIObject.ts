@@ -15,8 +15,9 @@ class PIXIObject extends PIXI.Container {
   init() {
     // noop
   }
-  update() {
-    // noop
+
+  update(interpolation: number) {
+    console.log('interpolation:', interpolation)
   }
 }
 
