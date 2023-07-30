@@ -9,7 +9,7 @@ export enum WorldEvents {
 }
 
 class World {
-  public static WORLD_HEIGHT = 1024 / 2
+  public static WORLD_HEIGHT = 1024
   public static WORLD_WIDTH = 1024
   private static WALL_HEIGHT = 50
   private static WALL_PREFIX = 'wall'
