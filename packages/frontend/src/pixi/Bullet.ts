@@ -1,7 +1,7 @@
 import Matter from 'matter-js'
 import * as PIXI from 'pixi.js'
 import { Assets } from 'pixi.js'
-import EngineBullet from 'src/engine/Bullet'
+import { Bullet as EngineBullet } from '@astroparty/engine'
 
 class Bullet extends PIXI.Sprite {
   engineBullet: EngineBullet

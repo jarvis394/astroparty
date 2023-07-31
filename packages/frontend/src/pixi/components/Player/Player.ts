@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js'
 import { Assets } from 'pixi.js'
-import EnginePlayer, { AliveState } from 'src/engine/Player'
+import { Player as EnginePlayer, AliveState } from '@astroparty/engine'
 import { degreesToRadian, lerp } from '@astroparty/shared/utils'
 import Matter from 'matter-js'
 

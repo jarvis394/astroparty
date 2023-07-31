@@ -18,8 +18,8 @@ class Engine {
     })
   }
 
-  public addPlayer() {
-    const player = this.game.world.createPlayer()
+  public addPlayer(id: string) {
+    const player = this.game.world.createPlayer(id)
     this.game.world.addPlayer(player)
     return player
   }

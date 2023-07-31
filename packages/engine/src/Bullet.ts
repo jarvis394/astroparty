@@ -1,4 +1,4 @@
-import getAngleVector from 'src/utils/getAngleVector'
+import getAngleVector from './utils/getAngleVector'
 import World from './World'
 import Matter from 'matter-js'
 import Player from './Player'

@@ -1,16 +1,20 @@
-import Engine from 'src/engine/Engine'
+import { Engine, World, WorldEvents } from '@astroparty/engine'
 import Application from 'src/pixi/Application'
 import Player from 'src/pixi/components/Player'
 import PIXIObject from 'src/pixi/PIXIObject'
-import World, { WorldEvents } from 'src/engine/World'
 import Bullet from 'src/pixi/Bullet'
 import { Graphics } from 'pixi.js'
+import * as Colyseus from 'colyseus.js'
+import { WS_HOSTNAME } from 'src/config/constants'
+import { GameRoomState } from '@astroparty/multiplayer/dist/rooms/game/game.schema'
 
 class MainScene extends PIXIObject {
   engine: Engine
   app: Application
+  client: Colyseus.Client
   players: Map<string, Player>
   bullets: Map<string, Bullet>
+  room?: Colyseus.Room<GameRoomState>
 
   constructor(app: Application, engine: Engine) {
     super(app, engine)
@@ -18,6 +22,7 @@ class MainScene extends PIXIObject {
     this.engine = engine
     this.players = new Map()
     this.bullets = new Map()
+    this.client = new Colyseus.Client(WS_HOSTNAME)
 
     // this.position.set(
     //   window.innerWidth / 2 - World.WORLD_WIDTH / 2,
@@ -93,8 +98,25 @@ class MainScene extends PIXIObject {
     this.removeChild(bullet)
   }
 
-  init() {
-    // noop
+  async init() {
+    this.room = await this.client.joinOrCreate<GameRoomState>('game')
+    const myId = this.room.sessionId
+    this.room.state.players.onAdd((player, id) => {
+      const enginePlayer = this.engine.addPlayer(id)
+
+      enginePlayer.body.position = player.position
+      enginePlayer.body.angle = player.angle
+      enginePlayer.aliveState = player.aliveState
+      enginePlayer.bullets = player.bullets
+
+      if (id === myId) {
+        this.engine.game.setMe(enginePlayer)
+      }
+
+      const pixiPlayer = new Player(enginePlayer)
+      this.players.set(player.id, pixiPlayer)
+      this.addChild(pixiPlayer)
+    })
   }
 
   update(interpolation: number) {

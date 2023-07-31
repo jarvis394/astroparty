@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js'
 import PIXIObject from 'src/pixi/PIXIObject'
 import Application from './Application'
-import Engine from 'src/engine/Engine'
+import { Engine } from '@astroparty/engine'
 import MainLoop from 'mainloop.js'
 
 export default class ScenesController extends PIXI.Container {
@@ -20,7 +20,7 @@ export default class ScenesController extends PIXI.Container {
     })
   }
 
-  loadScene(SceneConstructor: typeof PIXIObject) {
+  async loadScene(SceneConstructor: typeof PIXIObject) {
     if (this.activeScene) {
       this.removeChild(this.activeScene)
     }
@@ -28,6 +28,6 @@ export default class ScenesController extends PIXI.Container {
     const newScene = new SceneConstructor(this.app, this.engine)
     this.activeScene = newScene
     this.addChild(newScene)
-    newScene.init()
+    await newScene.init()
   }
 }

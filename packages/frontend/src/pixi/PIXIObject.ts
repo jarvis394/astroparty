@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js'
 import Application from './Application'
-import Engine from 'src/engine/Engine'
+import { Engine } from '@astroparty/engine'
 
 class PIXIObject extends PIXI.Container {
   engine: Engine
@@ -12,7 +12,7 @@ class PIXIObject extends PIXI.Container {
     this.engine = engine
   }
 
-  init() {
+  async init() {
     // noop
   }
 

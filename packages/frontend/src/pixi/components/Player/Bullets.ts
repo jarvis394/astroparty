@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import EnginePlayer from 'src/engine/Player'
+import { Player as EnginePlayer } from '@astroparty/engine'
 
 class Bullets extends PIXI.Container {
   enginePlayer: EnginePlayer

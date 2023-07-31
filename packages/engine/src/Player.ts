@@ -2,7 +2,7 @@ import World from './World'
 import Matter from 'matter-js'
 import { degreesToRadian } from '@astroparty/shared/utils'
 import Bullet from './Bullet'
-import getAngleVector from 'src/utils/getAngleVector'
+import getAngleVector from './utils/getAngleVector'
 
 export enum AliveState {
   ALIVE,
@@ -121,6 +121,13 @@ class Player {
   }
 
   public makeCraftDestroyed() {
+    if (
+      this.aliveState === AliveState.CRAFT_DESTROYED ||
+      this.aliveState === AliveState.DEAD
+    ) {
+      return
+    }
+
     const scale = Player.CRAFT_DESTROYED_HITBOX_RADIUS / Player.HITBOX_RADIUS
     Matter.Body.scale(this.body, scale, scale)
     Matter.Body.set(this.body, {
@@ -130,6 +137,10 @@ class Player {
   }
 
   public makeAlive() {
+    if (this.aliveState === AliveState.ALIVE) {
+      return
+    }
+
     const scale = Player.HITBOX_RADIUS / Player.CRAFT_DESTROYED_HITBOX_RADIUS
     Matter.Body.scale(this.body, scale, scale)
     Matter.Body.set(this.body, {

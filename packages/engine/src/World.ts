@@ -1,7 +1,10 @@
 import Matter from 'matter-js'
 import Bullet from './Bullet'
-import Player from './Player'
-import { EventEmitter, Listener } from 'events'
+import Player, { AliveState } from './Player'
+import { EventEmitter } from 'events'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Listener = (...args: any[]) => void
 
 export enum WorldEvents {
   BULLET_SPAWN = 'bullet_spawn',
@@ -42,7 +45,9 @@ class World {
         ) {
           Matter.World.remove(this.instance, a)
           this.eventEmitter.emit(WorldEvents.BULLET_DESTROYED, bulletId)
-          player.makeCraftDestroyed()
+          if (player.aliveState === AliveState.ALIVE) {
+            player.makeCraftDestroyed()
+          }
           return this.bullets.delete(bulletId)
         }
 
@@ -55,11 +60,11 @@ class World {
     })
   }
 
-  public addEventListener(type: string | number, listener: Listener) {
+  public addEventListener(type: string | symbol, listener: Listener) {
     this.eventEmitter.addListener(type, listener)
   }
 
-  public removeEventListener(type: string | number, listener: Listener) {
+  public removeEventListener(type: string | symbol, listener: Listener) {
     this.eventEmitter.removeListener(type, listener)
   }
 
@@ -74,7 +79,7 @@ class World {
     return this.bullets.values()
   }
 
-  public createPlayer(): Player {
+  public createPlayer(id: string): Player {
     const spawnPositions = [
       Matter.Vector.create(100, 100),
       Matter.Vector.create(World.WORLD_WIDTH - 100, World.WORLD_HEIGHT - 100),
@@ -83,7 +88,7 @@ class World {
     ]
 
     return new Player(
-      (this.players.size + 1).toString(),
+      id,
       spawnPositions[this.players.size % spawnPositions.length],
       this
     )
