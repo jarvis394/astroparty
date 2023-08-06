@@ -56,6 +56,8 @@ class Player {
    * Флаг для управления игроком (движения вперёд), когда корабль уничтожен (`AliveState.CRAFT_DESTROYED`)
    */
   isBoosting: boolean
+  /** Флаг для состояния, когда игрок обновляется по данным с сервера */
+  isServerControlled: boolean
 
   constructor(id: string, position: Matter.Vector, world: World) {
     this.id = id
@@ -72,6 +74,7 @@ class Player {
     this.isOpponent = true
     this.isMe = false
     this.isBoosting = false
+    this.isServerControlled = false
 
     Matter.World.addBody(this.world.instance, this.body)
   }
@@ -157,8 +160,10 @@ class Player {
     this.interpolation = interpolation
 
     this.processRotation()
-    this.forward()
-    this.processDash()
+    if (!this.isServerControlled) {
+      this.processDash()
+      this.forward()
+    }
   }
 
   private forward() {
@@ -218,6 +223,7 @@ class Player {
       frictionAir: Player.BODY_FRICTION_AIR,
       angularVelocity: 0,
       restitution: 0,
+      isSensor: true
     })
   }
 }

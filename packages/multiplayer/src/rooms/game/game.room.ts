@@ -18,6 +18,7 @@ export class GameRoom extends Room<GameRoomState> {
 
 		this.setSimulationInterval((delta) => {
 			this.engine.update(delta)
+
 			for (const enginePlayer of this.engine.game.world.getAllPlayersIterator()) {
 				const player = this.state.players.get(enginePlayer.id)
 
@@ -45,28 +46,45 @@ export class GameRoom extends Room<GameRoomState> {
 			}
 		}, Engine.MIN_DELTA)
 
-		this.onMessage('type', (client, message) => {
-			//
-			// handle "type" message
-			//
-		})
+		this.onMessage('rotate', (client, message) => {
+			const playerId = client.userData?.playerId
+			const player = this.engine.game.world.getPlayerByID(playerId)
 
-		Matter.Events.on(this.engine, 'afterUpdate', () => {
-			console.log('engine updated')
+			if (!player) {
+				return
+			}
+
+			console.log('rotate:', message)
+
+			switch (message) {
+				case 'start':
+					return (player.isRotating = true)
+				case 'stop':
+					return (player.isRotating = false)
+				default:
+					return client.error(500, `rotate message incorrect, got "${message}"`)
+			}
 		})
 	}
 
 	onJoin(client: Client, options: any) {
 		console.log(client.sessionId, 'joined!')
-		const playerId = client.sessionId
+		const { playerId } = options
 		const player = this.engine.addPlayer(playerId)
 		const position = new SchemaVector(player.body.position.x, player.body.position.y)
 		const schemaPlayer = new SchemaPlayer(playerId, position)
 		this.state.players.set(playerId, schemaPlayer)
+		client.userData = {
+			playerId,
+		}
+
+		client.send('init_room', this.state)
 	}
 
 	onLeave(client: Client, consented: boolean) {
 		console.log(client.sessionId, 'left!')
+		this.engine.game.world.players.delete(client.userData.playerId)
+		this.state.players.delete(client.userData.playerId)
 	}
 
 	onDispose() {

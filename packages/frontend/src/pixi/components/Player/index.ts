@@ -20,35 +20,6 @@ class PlayerContainer extends PIXI.Container {
 
     this.addChild(this.player)
     this.addChild(this.bullets)
-
-    window.addEventListener('keydown', this.onKeyDown.bind(this))
-    window.addEventListener('keyup', this.onKeyUp.bind(this))
-  }
-
-  onKeyDown(e: KeyboardEvent) {
-    if (!this.enginePlayer.isMe) return
-
-    switch (e.code) {
-      case 'ArrowRight':
-        this.enginePlayer.isRotating = true
-        break
-      case 'KeyW':
-        this.enginePlayer.dash()
-        break
-      case 'Space':
-        this.enginePlayer.shoot()
-        break
-    }
-  }
-
-  onKeyUp(e: KeyboardEvent) {
-    if (!this.enginePlayer.isMe) return
-
-    switch (e.key) {
-      case 'ArrowRight':
-        this.enginePlayer.isRotating = false
-        break
-    }
   }
 
   init() {

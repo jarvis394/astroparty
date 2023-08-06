@@ -17,7 +17,7 @@ export default class ScenesController extends PIXI.Container {
 
     MainLoop.setDraw((interpolation) => {
       this.activeScene?.update(interpolation)
-    })
+    }).start()
   }
 
   async loadScene(SceneConstructor: typeof PIXIObject) {
