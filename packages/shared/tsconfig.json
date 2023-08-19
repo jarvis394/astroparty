@@ -7,8 +7,9 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "sourceMap": true,
+    "target": "ES2021",
+    "module": "ESNext",
     "lib": ["ESNext"],
-    "module": "CommonJS",
     "moduleResolution": "Node",
     "rootDir": ".",
     "paths": {
@@ -19,10 +20,11 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "ES2016",
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
-    "composite": true
+    "composite": true,
+    "useDefineForClassFields": false,
+		"experimentalDecorators": true
   }
 }

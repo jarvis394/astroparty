@@ -36,12 +36,16 @@ class World {
         const bulletId = Bullet.getIdFromLabel(a.label)
         const playerId = Player.getIdFromLabel(b.label)
         const player = this.players.get(playerId)
+        const bullet = this.bullets.get(bulletId)
 
         if (
+          player &&
+          bullet &&
+          Bullet.isBullet(a) &&
           Player.isPlayer(b) &&
-          player?.isOpponent &&
-          this.bullets.has(bulletId) &&
-          player
+          player.isOpponent &&
+          bullet.playerId !== player.id &&
+          this.bullets.has(bulletId)
         ) {
           Matter.World.remove(this.instance, a)
           this.eventEmitter.emit(WorldEvents.BULLET_DESTROYED, bulletId)
@@ -94,8 +98,18 @@ class World {
     )
   }
 
-  public addPlayer(player: Player) {
+  public addPlayer(player: Player): Player {
     this.players.set(player.id, player)
+    return player
+  }
+
+  public removePlayer(id: string): boolean {
+    const player = this.getPlayerByID(id)
+
+    if (!player) return false
+
+    Matter.World.remove(this.instance, player.body)
+    return this.players.delete(id)
   }
 
   public getPlayerByID(id: string) {
@@ -110,9 +124,13 @@ class World {
     return this.players.values()
   }
 
-  public update(interpolation: number) {
+  public update() {
+    this.players.forEach((player) => {
+      player.update()
+    })
+
     this.bullets.forEach((bullet) => {
-      bullet.update(interpolation)
+      bullet.update()
     })
   }
 

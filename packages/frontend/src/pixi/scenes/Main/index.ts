@@ -1,4 +1,9 @@
-import { Engine, World, WorldEvents } from '@astroparty/engine'
+import {
+  Engine,
+  World,
+  WorldEvents,
+  Player as EnginePlayer,
+} from '@astroparty/engine'
 import Application from 'src/pixi/Application'
 import Player from 'src/pixi/components/Player'
 import PIXIObject from 'src/pixi/PIXIObject'
@@ -6,7 +11,8 @@ import Bullet from 'src/pixi/Bullet'
 import { Graphics } from 'pixi.js'
 import * as Colyseus from 'colyseus.js'
 import { WS_HOSTNAME } from 'src/config/constants'
-import { GameRoomState } from '@astroparty/multiplayer/dist/rooms/game/game.schema'
+import { GameRoomState } from '@astroparty/shared/colyseus/game.schema'
+import Matter, { Events } from 'matter-js'
 
 class MainScene extends PIXIObject {
   engine: Engine
@@ -76,9 +82,11 @@ class MainScene extends PIXIObject {
         this.engine.game.me.isRotating = true
         break
       case 'KeyW':
+        this.room?.send('dash')
         this.engine.game.me.dash()
         break
       case 'Space':
+        this.room?.send('shoot')
         this.engine.game.me.shoot()
         break
     }
@@ -152,11 +160,17 @@ class MainScene extends PIXIObject {
         // TODO: fixme
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ([id, serverPlayer]: [string, any]) => {
-          const player = this.engine.addPlayer(id)
-          player.body.position = serverPlayer.position
+          const player = new EnginePlayer(
+            id,
+            serverPlayer.position,
+            this.engine.game.world
+          )
           player.angle = serverPlayer.angle
           player.aliveState = serverPlayer.aliveState
           player.bullets = serverPlayer.bullets
+          // player.setServerControlled(this.playerId !== id)
+          player.setServerControlled(true)
+          this.engine.addPlayer(player)
 
           if (this.playerId === id) {
             this.engine.game.setMe(player)
@@ -165,45 +179,64 @@ class MainScene extends PIXIObject {
           const pixiPlayer = new Player(player)
           this.players.set(player.id, pixiPlayer)
           this.addChild(pixiPlayer)
-
-          player.isServerControlled = true
         }
       )
     })
 
-    // this.room.state.players.onAdd((player, id) => {
-    //   const enginePlayer = this.engine.addPlayer(id)
+    // TODO: fixme
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.room.onMessage('player_join', (serverPlayer: any) => {
+      if (!this.playerId) return
 
-    //   enginePlayer.body.position = player.position
-    //   enginePlayer.body.angle = player.angle
-    //   enginePlayer.aliveState = player.aliveState
-    //   enginePlayer.bullets = player.bullets
+      console.log('player_join', serverPlayer)
 
-    //   if (id === myId) {
-    //     this.engine.game.setMe(enginePlayer)
-    //   }
-
-    //   const pixiPlayer = new Player(enginePlayer)
-    //   this.players.set(player.id, pixiPlayer)
-    //   this.addChild(pixiPlayer)
-    // })
-  }
-
-  update(interpolation: number) {
-    for (const player of this.engine.game.world.getAllPlayersIterator()) {
-      const serverPlayer = this.room?.state.players.get(player.id)
-      if (!serverPlayer) return
-
-      player.body.position = serverPlayer.position
+      const player = new EnginePlayer(
+        serverPlayer.id,
+        serverPlayer.position,
+        this.engine.game.world
+      )
       player.angle = serverPlayer.angle
       player.aliveState = serverPlayer.aliveState
       player.bullets = serverPlayer.bullets
-    }
+      player.setServerControlled(true)
+      this.engine.game.world.players.set(player.id, player)
 
-    // console.log(
-    //   this.engine.game.me?.body.position,
-    //   this.room?.state.players.get(this.playerId || '')?.position.toJSON()
-    // )
+      const pixiPlayer = new Player(player)
+      this.players.set(player.id, pixiPlayer)
+      this.addChild(pixiPlayer)
+    })
+
+    this.room.onMessage('player_left', (playerId: string) => {
+      if (!this.playerId) return
+
+      console.log(
+        'player_left',
+        playerId,
+        this.engine.game.world.players,
+        this.players
+      )
+
+      this.engine.removePlayer(playerId)
+      this.players.delete(playerId)
+    })
+
+    Events.on(this.engine.matterEngine, 'beforeUpdate', () => {
+      this.engine.game.world.players.forEach((player) => {
+        const serverPlayer = this.room?.state.players.get(player.id)
+
+        if (!serverPlayer) return
+        if (!player.isServerControlled) return
+
+        Matter.Body.setPosition(player.body, serverPlayer.position)
+        Matter.Body.setVelocity(player.body, { x: 0, y: 0 })
+        player.angle = serverPlayer.angle
+        player.aliveState = serverPlayer.aliveState
+        player.bullets = serverPlayer.bullets
+      })
+    })
+  }
+
+  update(interpolation: number) {
     this.players.forEach((player) => {
       player.update(interpolation)
     })
