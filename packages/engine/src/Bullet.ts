@@ -12,7 +12,6 @@ class Bullet {
   playerId: string
   world: World
   body: Matter.Body
-  interpolation: number
 
   constructor(id: string, player: Player) {
     this.id = id
@@ -20,12 +19,9 @@ class Bullet {
     this.world = player.world
     this.body = Bullet.createBody(player.body)
     this.body.label = Bullet.getLabelFromId(id)
-    this.interpolation = 1
   }
 
-  public update(interpolation: number) {
-    this.interpolation = interpolation
-
+  public update() {
     this.forward()
   }
 

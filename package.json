@@ -4,11 +4,11 @@
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
-    "frontend:start": "cd packages/frontend && yarn dev",
-    "frontend:build": "cd packages/frontend && yarn build",
-    "backend:start": "cd packages/backend && yarn start:dev",
-    "backend:start:prod": "cd packages/backend && yarn build && yarn start:prod",
-    "shared:build": "cd packages/shared && yarn build",
+    "frontend:start": "yarn workspace @astroparty/frontend dev",
+    "frontend:build": "yarn workspace @astroparty/frontend build",
+    "multiplayer:start": "yarn workspace @astroparty/multiplayer start",
+    "shared:build": "yarn workspace @astroparty/shared build",
+    "engine:build": "yarn workspace @astroparty/engine build",
     "lint": "yarn lerna run lint",
     "lint:fix": "yarn lerna run lint:fix",
     "prepare": "husky install"

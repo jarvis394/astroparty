@@ -35,7 +35,6 @@ class Player {
   id: string
   world: World
   body: Matter.Body
-  interpolation: number
   bullets: number
   /** Угол поворота в градусах */
   angle: number
@@ -56,6 +55,8 @@ class Player {
    * Флаг для управления игроком (движения вперёд), когда корабль уничтожен (`AliveState.CRAFT_DESTROYED`)
    */
   isBoosting: boolean
+  /** Флаг для состояния, когда игрок обновляется по данным с сервера */
+  isServerControlled: boolean
 
   constructor(id: string, position: Matter.Vector, world: World) {
     this.id = id
@@ -66,12 +67,12 @@ class Player {
     this.isDashing = false
     this.angle = 0
     this.lastDashedMs = -1
-    this.interpolation = 1
     this.bullets = Player.BULLETS_AMOUNT
     this.aliveState = AliveState.ALIVE
     this.isOpponent = true
     this.isMe = false
     this.isBoosting = false
+    this.isServerControlled = false
 
     Matter.World.addBody(this.world.instance, this.body)
   }
@@ -153,12 +154,17 @@ class Player {
     this.aliveState = AliveState.DEAD
   }
 
-  public update(interpolation: number) {
-    this.interpolation = interpolation
+  public setServerControlled(state: boolean) {
+    this.isServerControlled = state
+    this.body.isSensor = state
+  }
 
+  public update() {
     this.processRotation()
-    this.forward()
-    this.processDash()
+    if (!this.isServerControlled) {
+      this.processDash()
+      this.forward()
+    }
   }
 
   private forward() {

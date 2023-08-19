@@ -1,7 +1,6 @@
 import { Room, Client } from '@colyseus/core'
-import { GameRoomState, SchemaPlayer, SchemaVector } from './game.schema'
-import { Engine, Player } from '@astroparty/engine'
-import Matter from 'matter-js'
+import { GameRoomState, SchemaPlayer, SchemaVector } from '@astroparty/shared/colyseus/game.schema'
+import { Engine } from '@astroparty/engine'
 
 export class GameRoom extends Room<GameRoomState> {
 	maxClients = 4
@@ -18,6 +17,7 @@ export class GameRoom extends Room<GameRoomState> {
 
 		this.setSimulationInterval((delta) => {
 			this.engine.update(delta)
+
 			for (const enginePlayer of this.engine.game.world.getAllPlayersIterator()) {
 				const player = this.state.players.get(enginePlayer.id)
 
@@ -45,28 +45,76 @@ export class GameRoom extends Room<GameRoomState> {
 			}
 		}, Engine.MIN_DELTA)
 
-		this.onMessage('type', (client, message) => {
-			//
-			// handle "type" message
-			//
+		this.onMessage('rotate', (client, message) => {
+			const playerId = client.userData?.playerId
+			const player = this.engine.game.world.getPlayerByID(playerId)
+
+			if (!player) {
+				return
+			}
+
+			console.log('rotate:', message)
+
+			switch (message) {
+				case 'start':
+					return (player.isRotating = true)
+				case 'stop':
+					return (player.isRotating = false)
+				default:
+					return client.error(500, `rotate message incorrect, got "${message}"`)
+			}
 		})
 
-		Matter.Events.on(this.engine, 'afterUpdate', () => {
-			console.log('engine updated')
+		this.onMessage('dash', (client) => {
+			const playerId = client.userData?.playerId
+			const player = this.engine.game.world.getPlayerByID(playerId)
+
+			if (!player) {
+				return
+			}
+
+			player.dash()
+		})
+
+		this.onMessage('shoot', (client) => {
+			const playerId = client.userData?.playerId
+			const player = this.engine.game.world.getPlayerByID(playerId)
+
+			if (!player) {
+				return
+			}
+
+			player.shoot()
 		})
 	}
 
 	onJoin(client: Client, options: any) {
 		console.log(client.sessionId, 'joined!')
-		const playerId = client.sessionId
-		const player = this.engine.addPlayer(playerId)
+
+		const { playerId } = options
+		const player = this.engine.createPlayer(playerId)
 		const position = new SchemaVector(player.body.position.x, player.body.position.y)
 		const schemaPlayer = new SchemaPlayer(playerId, position)
 		this.state.players.set(playerId, schemaPlayer)
+		this.engine.addPlayer(player)
+		client.userData = {
+			playerId,
+		}
+
+		client.send('init_room', this.state)
+		this.clients.forEach((broadcastClient) => {
+			// Skip just joined player
+			if (broadcastClient.userData.playerId === playerId) return
+
+			broadcastClient.send('player_join', schemaPlayer)
+		})
 	}
 
 	onLeave(client: Client, consented: boolean) {
-		console.log(client.sessionId, 'left!')
+		const playerId = client.userData.playerId
+		this.engine.removePlayer(playerId)
+		this.state.players.delete(playerId)
+		this.broadcast('player_left', playerId)
 	}
 
 	onDispose() {

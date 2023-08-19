@@ -22,7 +22,8 @@
     "types": ["vite/client"],
     "jsxImportSource": "@emotion/react",
     "composite": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "experimentalDecorators": true
   },
   "exclude": ["node_modules", "dist"],
   "include": ["src"],

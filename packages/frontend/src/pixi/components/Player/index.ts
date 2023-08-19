@@ -20,35 +20,6 @@ class PlayerContainer extends PIXI.Container {
 
     this.addChild(this.player)
     this.addChild(this.bullets)
-
-    window.addEventListener('keydown', this.onKeyDown.bind(this))
-    window.addEventListener('keyup', this.onKeyUp.bind(this))
-  }
-
-  onKeyDown(e: KeyboardEvent) {
-    if (!this.enginePlayer.isMe) return
-
-    switch (e.code) {
-      case 'ArrowRight':
-        this.enginePlayer.isRotating = true
-        break
-      case 'KeyW':
-        this.enginePlayer.dash()
-        break
-      case 'Space':
-        this.enginePlayer.shoot()
-        break
-    }
-  }
-
-  onKeyUp(e: KeyboardEvent) {
-    if (!this.enginePlayer.isMe) return
-
-    switch (e.key) {
-      case 'ArrowRight':
-        this.enginePlayer.isRotating = false
-        break
-    }
   }
 
   init() {
@@ -57,11 +28,20 @@ class PlayerContainer extends PIXI.Container {
 
   update(interpolation: number) {
     const position = this.enginePlayer.body.position
-
-    this.position.set(
-      this.position.x + (position.x - this.position.x) * interpolation,
+    const nextX =
+      this.position.x + (position.x - this.position.x) * interpolation
+    const nextY =
       this.position.y + (position.y - this.position.y) * interpolation
-    )
+
+    // if (this.enginePlayer.isServerControlled) {
+    //   this.position.set(
+    //     lerp(this.position.x, position.x, 0.1),
+    //     lerp(this.position.y, position.y, 0.1)
+    //   )
+    // } else {
+    //   this.position.set(nextX, nextY)
+    // }
+    this.position.set(nextX, nextY)
 
     this.player.update(interpolation)
     this.bullets.update(interpolation)

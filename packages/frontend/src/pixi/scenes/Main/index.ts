@@ -1,4 +1,9 @@
-import { Engine, World, WorldEvents } from '@astroparty/engine'
+import {
+  Engine,
+  World,
+  WorldEvents,
+  Player as EnginePlayer,
+} from '@astroparty/engine'
 import Application from 'src/pixi/Application'
 import Player from 'src/pixi/components/Player'
 import PIXIObject from 'src/pixi/PIXIObject'
@@ -6,7 +11,8 @@ import Bullet from 'src/pixi/Bullet'
 import { Graphics } from 'pixi.js'
 import * as Colyseus from 'colyseus.js'
 import { WS_HOSTNAME } from 'src/config/constants'
-import { GameRoomState } from '@astroparty/multiplayer/dist/rooms/game/game.schema'
+import { GameRoomState } from '@astroparty/shared/colyseus/game.schema'
+import Matter, { Events } from 'matter-js'
 
 class MainScene extends PIXIObject {
   engine: Engine
@@ -15,14 +21,17 @@ class MainScene extends PIXIObject {
   players: Map<string, Player>
   bullets: Map<string, Bullet>
   room?: Colyseus.Room<GameRoomState>
+  playerId: string | null
 
   constructor(app: Application, engine: Engine) {
     super(app, engine)
+    const params = new URLSearchParams(window.location.search)
     this.app = app
     this.engine = engine
     this.players = new Map()
     this.bullets = new Map()
     this.client = new Colyseus.Client(WS_HOSTNAME)
+    this.playerId = params.get('id')
 
     // this.position.set(
     //   window.innerWidth / 2 - World.WORLD_WIDTH / 2,
@@ -57,6 +66,41 @@ class MainScene extends PIXIObject {
     })
     rect.drawRect(0, 0, World.WORLD_WIDTH, World.WORLD_HEIGHT)
     // this.addChild(rect)
+
+    window.addEventListener('keydown', this.onKeyDown.bind(this))
+    window.addEventListener('keyup', this.onKeyUp.bind(this))
+
+    this.engine.start()
+  }
+
+  onKeyDown(e: KeyboardEvent) {
+    if (!this.engine.game.me) return
+
+    switch (e.code) {
+      case 'ArrowRight':
+        this.room?.send('rotate', 'start')
+        this.engine.game.me.isRotating = true
+        break
+      case 'KeyW':
+        this.room?.send('dash')
+        this.engine.game.me.dash()
+        break
+      case 'Space':
+        this.room?.send('shoot')
+        this.engine.game.me.shoot()
+        break
+    }
+  }
+
+  onKeyUp(e: KeyboardEvent) {
+    if (!this.engine.game.me) return
+
+    switch (e.key) {
+      case 'ArrowRight':
+        this.room?.send('rotate', 'stop')
+        this.engine.game.me.isRotating = false
+        break
+    }
   }
 
   handleBulletSpawn(bulletId: string) {
@@ -99,23 +143,96 @@ class MainScene extends PIXIObject {
   }
 
   async init() {
-    this.room = await this.client.joinOrCreate<GameRoomState>('game')
-    const myId = this.room.sessionId
-    this.room.state.players.onAdd((player, id) => {
-      const enginePlayer = this.engine.addPlayer(id)
+    if (!this.playerId) return
 
-      enginePlayer.body.position = player.position
-      enginePlayer.body.angle = player.angle
-      enginePlayer.aliveState = player.aliveState
-      enginePlayer.bullets = player.bullets
+    this.room = await this.client.joinOrCreate<GameRoomState>('game', {
+      playerId: this.playerId,
+    })
 
-      if (id === myId) {
-        this.engine.game.setMe(enginePlayer)
-      }
+    // TODO: fixme
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.room.onMessage('init_room', (data: any) => {
+      if (!this.playerId) return
 
-      const pixiPlayer = new Player(enginePlayer)
+      console.log('init_room', data)
+
+      Object.entries(data.players).forEach(
+        // TODO: fixme
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ([id, serverPlayer]: [string, any]) => {
+          const player = new EnginePlayer(
+            id,
+            serverPlayer.position,
+            this.engine.game.world
+          )
+          player.angle = serverPlayer.angle
+          player.aliveState = serverPlayer.aliveState
+          player.bullets = serverPlayer.bullets
+          // player.setServerControlled(this.playerId !== id)
+          player.setServerControlled(true)
+          this.engine.addPlayer(player)
+
+          if (this.playerId === id) {
+            this.engine.game.setMe(player)
+          }
+
+          const pixiPlayer = new Player(player)
+          this.players.set(player.id, pixiPlayer)
+          this.addChild(pixiPlayer)
+        }
+      )
+    })
+
+    // TODO: fixme
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.room.onMessage('player_join', (serverPlayer: any) => {
+      if (!this.playerId) return
+
+      console.log('player_join', serverPlayer)
+
+      const player = new EnginePlayer(
+        serverPlayer.id,
+        serverPlayer.position,
+        this.engine.game.world
+      )
+      player.angle = serverPlayer.angle
+      player.aliveState = serverPlayer.aliveState
+      player.bullets = serverPlayer.bullets
+      player.setServerControlled(true)
+      this.engine.game.world.players.set(player.id, player)
+
+      const pixiPlayer = new Player(player)
       this.players.set(player.id, pixiPlayer)
       this.addChild(pixiPlayer)
+    })
+
+    this.room.onMessage('player_left', (playerId: string) => {
+      if (!this.playerId) return
+
+      console.log(
+        'player_left',
+        playerId,
+        this.engine.game.world.players,
+        this.players
+      )
+
+      this.engine.removePlayer(playerId)
+      this.players.delete(playerId)
+    })
+
+    Events.on(this.engine.matterEngine, 'beforeUpdate', () => {
+      this.engine.game.world.players.forEach((player) => {
+        const serverPlayer = this.room?.state.players.get(player.id)
+
+        if (!serverPlayer) return
+        if (!player.isServerControlled) return
+
+        Matter.Body.setPosition(player.body, serverPlayer.position)
+        Matter.Body.setVelocity(player.body, { x: 0, y: 0 })
+        player.angle = serverPlayer.angle
+        player.aliveState = serverPlayer.aliveState
+        player.bullets = serverPlayer.bullets
+      })
     })
   }
 
@@ -123,7 +240,6 @@ class MainScene extends PIXIObject {
     this.players.forEach((player) => {
       player.update(interpolation)
     })
-
     this.bullets.forEach((bullet) => {
       bullet.update(interpolation)
     })

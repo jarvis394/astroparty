@@ -23,7 +23,6 @@ const App: React.FC = () => {
       Assets.add('ship_blue', shipBlueSprite)
       Assets.add('bullet', bulletSprite)
       await Assets.load(['ship_blue', 'bullet'])
-      engine.current.start()
       await scenesController.loadScene(SCENES.MainScene)
     }
 
