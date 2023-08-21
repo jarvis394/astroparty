@@ -126,16 +126,16 @@ class MainScene extends PIXIObject {
       )
     }
 
-    this.bullets.delete(engineBullet.id)
+    this.bullets.delete(bulletId)
     const bullet = this.children.find((e) => {
-      if (e instanceof Bullet && e.engineBullet.id === engineBullet.id) {
+      if (e instanceof Bullet && e.engineBullet.id === bulletId) {
         return e
       }
     })
 
     if (!bullet) {
       throw new Error(
-        `На stage не найден объект Bullet с id ${engineBullet.id}`
+        `На stage не найден объект Bullet с id ${bulletId}`
       )
     }
 
@@ -208,14 +208,24 @@ class MainScene extends PIXIObject {
 
     this.room.onMessage('player_left', (playerId: string) => {
       if (!this.playerId) return
+      const enginePlayer = this.engine.game.world.players.get(playerId)
+      if (!enginePlayer) {
+        throw new Error(
+          `В событии player_left передан несуществующий id: ${playerId}`
+        )
+      }
 
-      console.log(
-        'player_left',
-        playerId,
-        this.engine.game.world.players,
-        this.players
-      )
+      const pixiPlayer = this.children.find((e) => {
+        if (e instanceof Player && e.enginePlayer.id === playerId) {
+          return e
+        }
+      })
 
+      if (!pixiPlayer) {
+        throw new Error(`На stage не найден объект Player с id ${playerId}`)
+      }
+
+      this.removeChild(pixiPlayer)
       this.engine.removePlayer(playerId)
       this.players.delete(playerId)
     })
