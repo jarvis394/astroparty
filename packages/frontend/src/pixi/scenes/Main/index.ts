@@ -134,9 +134,7 @@ class MainScene extends PIXIObject {
     })
 
     if (!bullet) {
-      throw new Error(
-        `На stage не найден объект Bullet с id ${bulletId}`
-      )
+      throw new Error(`На stage не найден объект Bullet с id ${bulletId}`)
     }
 
     this.removeChild(bullet)
