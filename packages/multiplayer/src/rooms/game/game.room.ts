@@ -1,5 +1,5 @@
 import { Room, Client } from '@colyseus/core'
-import { GameRoomState, SchemaPlayer, SchemaVector } from '@astroparty/shared/colyseus/game.schema'
+import { GameRoomState, SchemaPlayer, SchemaVector } from '@astroparty/shared/colyseus/GameSchema'
 import { Engine } from '@astroparty/engine'
 
 export class GameRoom extends Room<GameRoomState> {
@@ -17,6 +17,8 @@ export class GameRoom extends Room<GameRoomState> {
 
 		this.setSimulationInterval((delta) => {
 			this.engine.update(delta)
+			this.state.frame = this.engine.frame
+			this.state.timestamp = this.clock.currentTime
 
 			for (const enginePlayer of this.engine.game.world.getAllPlayersIterator()) {
 				const player = this.state.players.get(enginePlayer.id)
