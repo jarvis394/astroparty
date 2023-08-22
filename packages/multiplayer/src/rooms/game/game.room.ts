@@ -1,5 +1,5 @@
 import { Room, Client } from '@colyseus/core'
-import { GameRoomState, SchemaPlayer, SchemaVector } from '@astroparty/shared/colyseus/GameSchema'
+import { GameRoomState, SchemaBullet, SchemaPlayer, SchemaVector } from '@astroparty/shared/colyseus/GameSchema'
 import { Engine } from '@astroparty/engine'
 
 export class GameRoom extends Room<GameRoomState> {
@@ -45,6 +45,12 @@ export class GameRoom extends Room<GameRoomState> {
 				bullet.position.x = engineBullet.body.position.x
 				bullet.position.y = engineBullet.body.position.y
 			}
+
+			this.state.bullets.forEach((bullet) => {
+				if (!this.engine.game.world.getBulletByID(bullet.id)) {
+					this.state.bullets.delete(bullet.id)
+				}
+			})
 		}, Engine.MIN_DELTA)
 
 		this.onMessage('rotate', (client, message) => {
@@ -54,8 +60,6 @@ export class GameRoom extends Room<GameRoomState> {
 			if (!player) {
 				return
 			}
-
-			console.log('rotate:', message)
 
 			switch (message) {
 				case 'start':
@@ -86,7 +90,16 @@ export class GameRoom extends Room<GameRoomState> {
 				return
 			}
 
-			player.shoot()
+			const bullet = player.shoot()
+
+			// Player doesn't have bullets, ignore message
+			if (!bullet) {
+				return
+			}
+
+			const schemaPosition = new SchemaVector(bullet.body.position.x, bullet.body.position.y)
+			const schemaBullet = new SchemaBullet(bullet.id, playerId, schemaPosition)
+			this.state.bullets.set(schemaBullet.id, schemaBullet)
 		})
 	}
 

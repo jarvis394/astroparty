@@ -36,13 +36,12 @@ class PlayerContainer extends PIXI.Container {
 
     if (this.enginePlayer.isServerControlled) {
       this.position.set(
-        lerp(this.position.x, position.x, 0.3),
-        lerp(this.position.y, position.y, 0.3)
+        lerp(this.position.x, position.x, 0.4),
+        lerp(this.position.y, position.y, 0.4)
       )
     } else {
       this.position.set(nextX, nextY)
     }
-    // this.position.set(nextX, nextY)
 
     this.player.update(interpolation)
     this.bullets.update(interpolation)
