@@ -96,12 +96,12 @@ class Player {
     }
   }
 
-  public shoot() {
+  public shoot(): Bullet | false {
     if (this.bullets <= 0) {
       return false
     }
 
-    const bullet = new Bullet((this.world.bulletsShot + 1).toString(), this)
+    const bullet = this.world.createBullet(this)
     this.world.addBullet(bullet)
     this.bullets -= 1
 
@@ -119,6 +119,8 @@ class Player {
     setTimeout(() => {
       this.bullets += 1
     }, Player.BULLET_REPLENISH_TIMEOUT)
+
+    return bullet
   }
 
   public makeCraftDestroyed() {

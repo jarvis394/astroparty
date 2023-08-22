@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js'
 import { Player as EnginePlayer } from '@astroparty/engine'
 import Bullets from './Bullets'
 import Player from './Player'
+import { lerp } from '@astroparty/shared/utils'
 
 class PlayerContainer extends PIXI.Container {
   enginePlayer: EnginePlayer
@@ -33,15 +34,14 @@ class PlayerContainer extends PIXI.Container {
     const nextY =
       this.position.y + (position.y - this.position.y) * interpolation
 
-    // if (this.enginePlayer.isServerControlled) {
-    //   this.position.set(
-    //     lerp(this.position.x, position.x, 0.1),
-    //     lerp(this.position.y, position.y, 0.1)
-    //   )
-    // } else {
-    //   this.position.set(nextX, nextY)
-    // }
-    this.position.set(nextX, nextY)
+    if (this.enginePlayer.isServerControlled) {
+      this.position.set(
+        lerp(this.position.x, position.x, 0.4),
+        lerp(this.position.y, position.y, 0.4)
+      )
+    } else {
+      this.position.set(nextX, nextY)
+    }
 
     this.player.update(interpolation)
     this.bullets.update(interpolation)

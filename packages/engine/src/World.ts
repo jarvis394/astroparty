@@ -1,17 +1,21 @@
 import Matter from 'matter-js'
 import Bullet from './Bullet'
 import Player, { AliveState } from './Player'
-import { EventEmitter } from 'events'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Listener = (...args: any[]) => void
+import EventEmitter from './EventEmitter'
 
 export enum WorldEvents {
   BULLET_SPAWN = 'bullet_spawn',
-  BULLET_DESTROYED = 'bullet_destroyed',
+  BULLET_DESPAWN = 'bullet_despawn',
+  PLAYER_DESPAWN = 'player_despawn',
 }
 
-class World {
+type WorldEmitterEvents = {
+  [WorldEvents.BULLET_SPAWN]: (bulletId: string) => void
+  [WorldEvents.BULLET_DESPAWN]: (bulletId: string) => void
+  [WorldEvents.PLAYER_DESPAWN]: (playerId: string) => void
+}
+
+class World extends EventEmitter<WorldEmitterEvents> {
   public static WORLD_HEIGHT = 1024
   public static WORLD_WIDTH = 1024
   private static WALL_HEIGHT = 50
@@ -24,9 +28,9 @@ class World {
   // TODO: убрать, юзать айдишники из бд
   /** Используется для вычисления ID новой пульки при её создании */
   bulletsShot = 0
-  private eventEmitter = new EventEmitter()
 
   constructor({ matterEngine }: { matterEngine: Matter.Engine }) {
+    super()
     this.instance = matterEngine.world
     this.walls = this.addWorldWalls()
 
@@ -48,7 +52,7 @@ class World {
           this.bullets.has(bulletId)
         ) {
           Matter.World.remove(this.instance, a)
-          this.eventEmitter.emit(WorldEvents.BULLET_DESTROYED, bulletId)
+          this.eventEmitter.emit(WorldEvents.BULLET_DESPAWN, bulletId)
           if (player.aliveState === AliveState.ALIVE) {
             player.makeCraftDestroyed()
           }
@@ -57,19 +61,11 @@ class World {
 
         if (this.bullets.has(bulletId) && b.label === World.WALL_PREFIX) {
           Matter.World.remove(this.instance, a)
-          this.eventEmitter.emit(WorldEvents.BULLET_DESTROYED, bulletId)
+          this.eventEmitter.emit(WorldEvents.BULLET_DESPAWN, bulletId)
           return this.bullets.delete(bulletId)
         }
       }
     })
-  }
-
-  public addEventListener(type: string | symbol, listener: Listener) {
-    this.eventEmitter.addListener(type, listener)
-  }
-
-  public removeEventListener(type: string | symbol, listener: Listener) {
-    this.eventEmitter.removeListener(type, listener)
   }
 
   public addBullet(bullet: Bullet) {
@@ -98,6 +94,13 @@ class World {
     )
   }
 
+  public createBullet(
+    player: Player,
+    id: string = (this.bulletsShot + 1).toString()
+  ): Bullet {
+    return new Bullet(id, player)
+  }
+
   public addPlayer(player: Player): Player {
     this.players.set(player.id, player)
     return player
@@ -109,11 +112,26 @@ class World {
     if (!player) return false
 
     Matter.World.remove(this.instance, player.body)
+    this.eventEmitter.emit(WorldEvents.PLAYER_DESPAWN, player.id)
     return this.players.delete(id)
+  }
+
+  public removeBullet(id: string): boolean {
+    const bullet = this.getBulletByID(id)
+
+    if (!bullet) return false
+
+    Matter.World.remove(this.instance, bullet.body)
+    this.eventEmitter.emit(WorldEvents.BULLET_DESPAWN, bullet.id)
+    return this.bullets.delete(id)
   }
 
   public getPlayerByID(id: string) {
     return this.players.get(id)
+  }
+
+  public getBulletByID(id: string) {
+    return this.bullets.get(id)
   }
 
   public doesPlayerExistByID(id: string) {
