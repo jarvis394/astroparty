@@ -10,4 +10,7 @@ check_run() {
         echo "✨ В $1 нет изменений, не будем переустанавливать зависимости"
     fi
 }
+
 check_run package.json "yarn && yarn lerna bootstrap"
+check_run packages/shared/* "yarn shared:build"
+check_run packages/engine/* "yarn shared:build"
