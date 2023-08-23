@@ -34,6 +34,7 @@ class Player extends PIXI.Container {
 
   update(interpolation: number) {
     const angle = this.enginePlayer.body.angle
+    const nextAngle = this.rotation + (angle - this.rotation) * interpolation
 
     // Не уверен, что на каждом тике применять scale это хорошая идея, но и проблем не заметил
     if (this.enginePlayer.aliveState === AliveState.CRAFT_DESTROYED) {
@@ -45,13 +46,9 @@ class Player extends PIXI.Container {
     }
 
     if (this.enginePlayer.isDashing) {
-      this.rotation = lerp(
-        this.rotation,
-        this.rotation + (angle - this.rotation) * interpolation,
-        0.2
-      )
+      this.rotation = lerp(this.rotation, nextAngle, 0.2)
     } else {
-      this.rotation += (angle - this.rotation) * interpolation
+      this.rotation = lerp(this.rotation, nextAngle, 0.4)
     }
   }
 }

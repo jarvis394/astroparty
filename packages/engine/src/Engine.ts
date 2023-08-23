@@ -9,6 +9,7 @@ class Engine {
 
   game: Game
   matterEngine: Matter.Engine
+  frame: number
 
   constructor() {
     this.matterEngine = Matter.Engine.create({
@@ -17,6 +18,7 @@ class Engine {
     this.game = new Game({
       matterEngine: this.matterEngine,
     })
+    this.frame = 0
   }
 
   public addPlayer(player: Player): Player {
@@ -36,6 +38,7 @@ class Engine {
   public update(delta: number) {
     Matter.Engine.update(this.matterEngine, delta)
     this.game.update()
+    this.frame += 1
   }
 
   public start() {

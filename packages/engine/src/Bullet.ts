@@ -12,6 +12,8 @@ class Bullet {
   playerId: string
   world: World
   body: Matter.Body
+  /** Флаг для состояния, когда игрок обновляется по данным с сервера */
+  isServerControlled: boolean
 
   constructor(id: string, player: Player) {
     this.id = id
@@ -19,10 +21,11 @@ class Bullet {
     this.world = player.world
     this.body = Bullet.createBody(player.body)
     this.body.label = Bullet.getLabelFromId(id)
+    this.isServerControlled = false
   }
 
   public update() {
-    this.forward()
+    !this.isServerControlled && this.forward()
   }
 
   private forward() {
@@ -30,6 +33,10 @@ class Bullet {
       this.body,
       Matter.Vector.mult(getAngleVector(this.body), Bullet.VELOCITY)
     )
+  }
+
+  public setServerControlled(state: boolean) {
+    this.isServerControlled = state
   }
 
   public static getLabelFromId(id: string) {
