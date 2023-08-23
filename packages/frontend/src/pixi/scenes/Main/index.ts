@@ -231,7 +231,6 @@ class MainScene extends PIXIObject {
     Events.on(this.engine.matterEngine, 'beforeUpdate', () => {
       this.engine.game.world.players.forEach((player) => {
         const serverPlayer = this.room?.state.players.get(player.id)
-
         if (!serverPlayer) return
         if (!player.isServerControlled) return
 

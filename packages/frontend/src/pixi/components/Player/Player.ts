@@ -5,6 +5,8 @@ import { degreesToRadian, lerp } from '@astroparty/shared/utils'
 import Matter from 'matter-js'
 
 class Player extends PIXI.Container {
+  private static ALIVE_SCALE = 4
+  private static CRAFT_DESTROYED_SCALE = 2
   private static SPRITE_ANGLE_CORRECTION = 90
   private static SPRITE_POSITION_CORRECTION = Matter.Vector.create(2, 0)
   enginePlayer: EnginePlayer
@@ -14,7 +16,7 @@ class Player extends PIXI.Container {
     super()
     this.sprite = new PIXI.Sprite(Assets.get('ship_blue'))
     this.enginePlayer = enginePlayer
-    this.scale.set(4)
+    this.scale.set(Player.ALIVE_SCALE)
     this.rotation = enginePlayer.body.angle
     this.sprite.anchor.set(0.5)
     this.sprite.position.set(
@@ -33,8 +35,13 @@ class Player extends PIXI.Container {
   update(interpolation: number) {
     const angle = this.enginePlayer.body.angle
 
+    // Не уверен, что на каждом тике применять scale это хорошая идея, но и проблем не заметил
     if (this.enginePlayer.aliveState === AliveState.CRAFT_DESTROYED) {
-      this.scale.set(2)
+      this.scale.set(Player.CRAFT_DESTROYED_SCALE)
+    }
+
+    if (this.enginePlayer.aliveState === AliveState.ALIVE) {
+      this.scale.set(Player.ALIVE_SCALE)
     }
 
     if (this.enginePlayer.isDashing) {

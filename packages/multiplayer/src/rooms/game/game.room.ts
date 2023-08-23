@@ -30,6 +30,7 @@ export class GameRoom extends Room<GameRoomState> {
 				player.position.y = enginePlayer.body.position.y
 				player.angle = enginePlayer.angle
 				player.bullets = enginePlayer.bullets
+				player.aliveState = enginePlayer.aliveState
 			}
 
 			for (const engineBullet of this.engine.game.world.getAllBulletsIterator()) {
