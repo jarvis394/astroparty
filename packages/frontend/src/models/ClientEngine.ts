@@ -2,15 +2,13 @@ import {
   GameRoomState,
   SchemaPlayer,
 } from '@astroparty/shared/colyseus/GameSchema'
-import {
-  SnapshotBuffer,
-  Snapshot,
-  SnapshotPlayer,
-  SnapshotBullet,
-} from '@astroparty/shared/colyseus/Snapshot'
+import { SnapshotHistory, Snapshot } from '@astroparty/shared/colyseus/Snapshot'
 import { EventEmitter, Engine, Player } from '@astroparty/engine'
 import Matter from 'matter-js'
-import { WS_HOSTNAME } from 'src/config/constants'
+import {
+  MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED,
+  WS_HOSTNAME,
+} from 'src/config/constants'
 import * as Colyseus from 'colyseus.js'
 
 export enum ClientEngineEvents {
@@ -26,7 +24,7 @@ type ClientEngineEmitterEvents = {
 }
 
 export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
-  snapshotBuffer: SnapshotBuffer
+  snapshotHistory: SnapshotHistory
   client: Colyseus.Client
   engine: Engine
   room?: Colyseus.Room<GameRoomState>
@@ -36,7 +34,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
   constructor(engine: Engine, playerId: string | null) {
     super()
-    this.snapshotBuffer = new SnapshotBuffer()
+    this.snapshotHistory = new SnapshotHistory()
     this.engine = engine
     this.client = new Colyseus.Client(WS_HOSTNAME)
     this.playerId = playerId
@@ -63,122 +61,25 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     this.registerSocketHandlers(this.room)
 
     // TODO: fixme proper reenact
-    setInterval(() => {
-      this.frameSync(true)
-      console.log('update')
-    }, 6000)
+    // setInterval(() => {
+    //   this.frameSync(true)
+    //   console.log('update')
+    // }, 6000)
   }
 
   // TODO fixme remove overrideLocal
   frameSync(overrideLocal = false) {
-    if (this.snapshotBuffer.length > 30) {
-      this.snapshotBuffer.reset()
+    if (this.snapshotHistory.length > 30) {
+      this.snapshotHistory.reset()
     }
 
-    const currentSnapshot = this.snapshotBuffer.shift()
+    let currentSnapshot = this.snapshotHistory.shift()
+    while (currentSnapshot && currentSnapshot.frame < this.engine.frame) {
+      currentSnapshot = this.snapshotHistory.shift()
+    }
     if (!currentSnapshot) return
 
-    this.syncStateBySnapshot(currentSnapshot, overrideLocal)
-  }
-
-  // TODO fixme remove overrideLocal
-  syncStateBySnapshot(snapshot: Snapshot, overrideLocal = false) {
-    this.engine.game.world.players.forEach((player) => {
-      const snapshotPlayer = snapshot.players.get(player.id)
-
-      if (!snapshotPlayer) {
-        return this.engine.game.world.removePlayer(player.id)
-      }
-
-      // TODO fixme remove overrideLocal
-      if (!overrideLocal && !player.isServerControlled) return
-
-      Matter.Body.setPosition(player.body, snapshotPlayer.position)
-      Matter.Body.setVelocity(player.body, { x: 0, y: 0 })
-      player.angle = snapshotPlayer.angle
-      player.aliveState = snapshotPlayer.aliveState
-      player.bullets = snapshotPlayer.bullets
-    })
-
-    this.engine.game.world.bullets.forEach((bullet) => {
-      const snapshotBullet = snapshot.bullets.get(bullet.id)
-
-      if (!snapshotBullet) {
-        return this.engine.game.world.removeBullet(bullet.id)
-      }
-
-      if (!bullet.isServerControlled) return
-
-      Matter.Body.setPosition(bullet.body, snapshotBullet.position)
-      Matter.Body.setVelocity(bullet.body, { x: 0, y: 0 })
-    })
-
-    snapshot.bullets.forEach((snapshotBullet) => {
-      if (this.engine.game.world.getBulletByID(snapshotBullet.id)) return
-
-      const player = this.engine.game.world.getPlayerByID(
-        snapshotBullet.playerId
-      )
-
-      if (!player) {
-        console.error(
-          `No player with ID "${snapshotBullet.playerId}" was found when trying to add bullet`
-        )
-        return
-      }
-
-      const bullet = this.engine.game.world.createBullet(
-        player,
-        snapshotBullet.id
-      )
-      bullet.setServerControlled(true)
-      this.engine.game.world.addBullet(bullet)
-    })
-
-    this.engine.frame = snapshot.frame
-  }
-
-  generateSnapshot(state: GameRoomState): Snapshot {
-    const players = new Map()
-    const bullets = new Map()
-
-    state.players.forEach((player, id) => {
-      players.set(
-        id,
-        new SnapshotPlayer({
-          id,
-          position: {
-            x: player.position.x,
-            y: player.position.y,
-          },
-          bullets: player.bullets,
-          aliveState: player.aliveState,
-          angle: player.angle,
-        })
-      )
-    })
-
-    state.bullets.forEach((bullet, id) => {
-      bullets.set(
-        id,
-        new SnapshotBullet({
-          id,
-          position: {
-            x: bullet.position.x,
-            y: bullet.position.y,
-          },
-          playerId: bullet.playerId,
-        })
-      )
-    })
-
-    return new Snapshot({
-      frame: state.frame,
-      bullets,
-      players,
-      next: null,
-      timestamp: state.timestamp,
-    })
+    Snapshot.syncEngineBySnapshot(this.engine, currentSnapshot, overrideLocal)
   }
 
   handleInitRoom(state: GameRoomState) {
@@ -193,7 +94,13 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       player.angle = serverPlayer.angle
       player.aliveState = serverPlayer.aliveState
       player.bullets = serverPlayer.bullets
-      player.setServerControlled(this.playerId !== serverPlayer.id)
+
+      if (MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
+        player.setServerControlled(true)
+      } else {
+        player.setServerControlled(this.playerId !== serverPlayer.id)
+      }
+
       this.engine.addPlayer(player)
 
       if (this.playerId === serverPlayer.id) {
@@ -247,33 +154,61 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   }
 
   registerSocketHandlers(room: Colyseus.Room<GameRoomState>) {
-    room.onStateChange((state) => {
-      this.snapshotBuffer.push(this.generateSnapshot(state))
-    })
-
     room.onMessage('init_room', this.handleInitRoom.bind(this))
+    room.onMessage('snapshot', this.handleSnapshotRecieve.bind(this))
     room.onMessage('player_join', this.handlePlayerJoin.bind(this))
     room.onMessage('player_left', this.handlePlayerLeft.bind(this))
+  }
+
+  handleSnapshotRecieve(state: Snapshot) {
+    this.snapshotHistory.push(state.frame, state)
   }
 
   handleKeyDown(keyCode: string) {
     if (!this.engine.game.me) return
 
     switch (keyCode) {
-      case 'ArrowRight':
-        if (this.engine.game.me.isRotating) return
-        this.room?.send('rotate', 'start')
-        this.engine.game.me.isRotating = true
+      // Поворот направо
+      case 'ArrowRight': {
+        if (this.engine.game.me?.isRotating) return
+
+        console.log('rotate start at frame:', this.engine.frame)
+
+        this.room?.send('rotate', {
+          frame: this.engine.frame,
+        })
+
+        // if (!MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
+        this.engine.game.me.rotate()
+        // }
+
         break
-      case 'KeyW':
-        if (this.engine.game.me.isDashing) return
+      }
+      // Прыжок
+      case 'KeyW': {
+        if (
+          !MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED &&
+          this.engine.game.me.isDashing
+        ) {
+          return
+        }
+
         this.room?.send('dash')
-        this.engine.game.me.dash()
+
+        if (!MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
+          this.engine.game.me.dash()
+        }
         break
+      }
+      // Выстрел
       case 'Space':
         if (this.isHoldingShootButton) return
         this.room?.send('shoot')
-        this.engine.game.me.shoot()
+
+        if (!MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
+          this.engine.game.me.shoot()
+        }
+
         this.isHoldingShootButton = true
         break
     }
@@ -289,13 +224,23 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     if (!this.engine.game.me) return
 
     switch (e.code) {
-      case 'ArrowRight':
-        this.room?.send('rotate', 'stop')
-        this.engine.game.me.isRotating = false
-        break
-      case 'Space':
+      // Поворот направо
+      // case 'ArrowRight': {
+      //   console.log('rotate stop at frame:', this.engine.frame)
+
+      //   this.room?.send('rotate', {
+      //     action: 'stop',
+      //     frame: this.engine.frame,
+      //   })
+
+      //   this.engine.game.me.isRotating = false
+      //   break
+      // }
+      // Выстрел
+      case 'Space': {
         this.isHoldingShootButton = false
         break
+      }
     }
   }
 }

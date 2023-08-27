@@ -1,0 +1,1 @@
+export { GameRoom } from './game'

@@ -10,6 +10,7 @@ import {
   GameRoomState,
   SchemaPlayer,
 } from '@astroparty/shared/colyseus/GameSchema'
+import MainLoop from 'mainloop.js'
 
 class MainScene extends PIXIObject {
   app: Application

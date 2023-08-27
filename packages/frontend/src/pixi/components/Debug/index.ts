@@ -21,7 +21,7 @@ class Debug extends PIXI.Container {
 
     this.clientEngine.engine.game.world.players.forEach((player) => {
       const playerPosition = new PIXI.Text(
-        `id: ${player.id}\nx: ${player.body.position.x}\ny: ${player.body.position.y}\nangle: ${player.angle}\naliveState: ${player.aliveState}\nbullets: ${player.bullets}`,
+        `id: ${player.id}\nx: ${player.body.position.x}\ny: ${player.body.position.y}\nangle: ${player.angle}\naliveState: ${player.aliveState}\nbullets: ${player.bullets}\nisServerControlled: ${player.isServerControlled}`,
         new PIXI.TextStyle({
           fill: 0xffffff,
           fontSize: 16,

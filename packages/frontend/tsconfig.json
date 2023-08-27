@@ -26,6 +26,6 @@
     "experimentalDecorators": true
   },
   "exclude": ["node_modules", "dist"],
-  "include": ["src"],
+  "include": ["src", "../multiplayer/src/engine/SnapshotHistory.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

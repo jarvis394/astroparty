@@ -158,18 +158,18 @@ class Player {
 
   public setServerControlled(state: boolean) {
     this.isServerControlled = state
-    this.body.isSensor = state
+    // this.body.isSensor = state
   }
 
   public update() {
-    this.processRotation()
-    if (!this.isServerControlled) {
-      this.processDash()
-      this.forward()
-    }
+    if (this.isServerControlled) return
+
+    this.processRotate()
+    this.processDash()
+    this.forward()
   }
 
-  private forward() {
+  public forward() {
     if (this.aliveState === AliveState.DEAD) return
     if (this.aliveState === AliveState.CRAFT_DESTROYED && !this.isBoosting)
       return
@@ -183,16 +183,16 @@ class Player {
     }
   }
 
-  private processRotation() {
-    if (this.isRotating) {
-      this.angle += Player.ROTATE_ANGLE
-    }
+  public rotate() {
+    this.angle += Player.ROTATE_ANGLE
+  }
 
+  public processRotate() {
     Matter.Body.setAngularVelocity(this.body, 0)
     Matter.Body.setAngle(this.body, degreesToRadian(this.angle))
   }
 
-  private processDash() {
+  public processDash() {
     if (!this.isDashing) return
 
     Matter.Body.set(this.body, {
