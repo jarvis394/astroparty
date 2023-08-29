@@ -29,19 +29,11 @@ class PlayerContainer extends PIXI.Container {
 
   update(interpolation: number) {
     const position = this.enginePlayer.body.position
-    const nextX =
-      this.position.x + (position.x - this.position.x) * interpolation
-    const nextY =
-      this.position.y + (position.y - this.position.y) * interpolation
 
-    if (this.enginePlayer.isServerControlled) {
-      this.position.set(
-        lerp(this.position.x, position.x, 0.4),
-        lerp(this.position.y, position.y, 0.4)
-      )
-    } else {
-      this.position.set(nextX, nextY)
-    }
+    this.position.set(
+      lerp(this.position.x, position.x, 0.4),
+      lerp(this.position.y, position.y, 0.4)
+    )
 
     this.player.update(interpolation)
     this.bullets.update(interpolation)

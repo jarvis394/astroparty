@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js'
 import { Player as EnginePlayer } from '@astroparty/engine'
 
 class Bullets extends PIXI.Container {
+  static BULLETS_ROTATE_ANGLE = 2
   enginePlayer: EnginePlayer
   bulletsCount: number
 
@@ -36,7 +37,7 @@ class Bullets extends PIXI.Container {
       this.drawBullets()
     }
 
-    this.angle += 2 * interpolation
+    this.angle += Bullets.BULLETS_ROTATE_ANGLE * interpolation
   }
 }
 

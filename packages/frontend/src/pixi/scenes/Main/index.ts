@@ -2,14 +2,14 @@ import { Engine, World, WorldEvents } from '@astroparty/engine'
 import Application from 'src/pixi/Application'
 import Player from 'src/pixi/components/Player'
 import PIXIObject from 'src/pixi/PIXIObject'
-import Bullet from 'src/pixi/Bullet'
+import Bullet from 'src/pixi/components/Bullet'
 import { Graphics } from 'pixi.js'
-import Debug from 'src/pixi/components/Debug'
 import { ClientEngine, ClientEngineEvents } from 'src/models/ClientEngine'
 import {
   GameRoomState,
   SchemaPlayer,
 } from '@astroparty/shared/colyseus/GameSchema'
+import Debug from 'src/pixi/components/Debug'
 
 class MainScene extends PIXIObject {
   app: Application
