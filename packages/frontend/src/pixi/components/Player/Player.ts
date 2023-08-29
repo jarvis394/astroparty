@@ -47,8 +47,11 @@ class Player extends PIXI.Container {
 
     if (this.enginePlayer.isDashing) {
       this.rotation = lerp(this.rotation, nextAngle, 0.2)
+    } else if (Math.abs(angle - this.rotation) > degreesToRadian(90)) {
+      // Update angle instantly if rotation is too big
+      this.rotation = angle
     } else {
-      this.rotation = lerp(this.rotation, nextAngle, 0.4)
+      this.rotation = lerp(this.rotation, nextAngle, 0.3)
     }
   }
 }

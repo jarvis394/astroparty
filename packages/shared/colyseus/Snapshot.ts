@@ -1,250 +1,151 @@
-import { Engine, Player, AliveState } from '@astroparty/engine'
+import { Engine, AliveState, Bullet } from '@astroparty/engine'
 import Matter from 'matter-js'
 import { degreesToRadian } from '../utils'
+import { Types } from '@geckos.io/snapshot-interpolation'
 
-export class SnapshotHistory {
-  public static MAX_LENGTH = 100
-  maxLength: number
-  history: Record<Snapshot['frame'], Snapshot>
-  length: number
-  firstFrame: number | null
-  lastFrame: number | null
-
-  constructor(maxLength: number = SnapshotHistory.MAX_LENGTH) {
-    this.history = {}
-    this.firstFrame = null
-    this.lastFrame = null
-    this.length = 0
-    this.maxLength = maxLength
-  }
-
-  isEmpty() {
-    return this.length === 0
-  }
-
-  push(frame: Snapshot['frame'], snapshot: Snapshot) {
-    if (this.isEmpty()) {
-      this.firstFrame = frame
-    }
-
-    this.history[frame] = snapshot
-    this.lastFrame = frame
-
-    this.length++
-
-    if (this.length > this.maxLength) {
-      this.shift()
-    }
-  }
-
-  shift() {
-    if (this.isEmpty() || !this.firstFrame) {
-      return false
-    }
-    const snapshot = this.history[this.firstFrame]
-    delete this.history[this.firstFrame]
-    this.firstFrame++
-    this.length--
-    return snapshot
-  }
-
-  at(frame: number): Snapshot | false {
-    if (this.history[frame] === undefined) {
-      return false
-    }
-
-    return this.history[frame]
-  }
-
-  update(frame: number, snapshot: Snapshot) {
-    this.history[frame] = snapshot
-  }
-
-  reset() {
-    this.history = {}
-    this.firstFrame = null
-    this.lastFrame = null
-    this.length = 0
-  }
-}
-
-export class SnapshotPlayer {
+export type SnapshotPlayer = {
   id: string
   bullets: number
   angle: number
   aliveState: AliveState
-  position: Matter.Vector
-  velocity: Matter.Vector
-  angularVelocity: number
-
-  constructor({
-    id,
-    position,
-    angle = 0,
-    bullets = Player.BULLETS_AMOUNT,
-    aliveState = AliveState.ALIVE,
-    velocity,
-    angularVelocity,
-  }: {
-    id: string
-    bullets: number
-    angle: number
-    aliveState: AliveState
-    position: Matter.Vector
-    velocity: Matter.Vector
-    angularVelocity: number
-  }) {
-    this.id = id
-    this.position = position
-    this.angle = angle
-    this.aliveState = aliveState
-    this.bullets = bullets
-    this.velocity = velocity
-    this.angularVelocity = angularVelocity
-  }
+  positionX: number
+  positionY: number
+  velocityX: number
+  velocityY: number
 }
 
-export class SnapshotBullet {
+export type SnapshotBullet = {
   id: string
   playerId: string
-  position: Matter.Vector
+  positionX: number
+  positionY: number
+}
 
-  constructor({
-    id,
-    position,
-    playerId,
-  }: {
-    id: string
-    playerId: string
-    position: Matter.Vector
-  }) {
-    this.id = id
-    this.playerId = playerId
-    this.position = position
+export interface Snapshot extends Types.Snapshot {
+  id: Types.ID
+  time: Types.Time
+  state: {
+    players: SnapshotPlayer[]
+    bullets: SnapshotBullet[]
   }
 }
 
-export class Snapshot {
-  frame: number
-  next: Snapshot | null
-  players: Record<SnapshotPlayer['id'], SnapshotPlayer>
-  bullets: Record<SnapshotBullet['id'], SnapshotBullet>
+export const generateSnapshot = (engine: Engine): Snapshot => {
+  const players: SnapshotPlayer[] = []
+  const bullets: SnapshotBullet[] = []
 
-  constructor({
-    frame,
-    players,
-    bullets,
-    next = null,
-  }: {
-    frame: number
-    next: Snapshot | null
-    players: Record<SnapshotPlayer['id'], SnapshotPlayer>
-    bullets: Record<SnapshotBullet['id'], SnapshotBullet>
-  }) {
-    this.frame = frame
-    this.players = players
-    this.bullets = bullets
-    this.next = next
-  }
-
-  public static generateSnapshot(engine: Engine): Snapshot {
-    const players: Record<SnapshotPlayer['id'], SnapshotPlayer> = {}
-    const bullets: Record<SnapshotBullet['id'], SnapshotBullet> = {}
-
-    engine.game.world.players.forEach((player) => {
-      players[player.id] = new SnapshotPlayer({
-        id: player.id,
-        position: {
-          x: player.body.position.x,
-          y: player.body.position.y,
-        },
-        bullets: player.bullets,
-        aliveState: player.aliveState,
-        angle: player.angle,
-        velocity: player.body.velocity,
-        angularVelocity: player.body.angularVelocity,
-      })
+  engine.game.world.players.forEach((player) => {
+    players.push({
+      id: player.id,
+      positionX: player.body.position.x,
+      positionY: player.body.position.y,
+      bullets: player.bullets,
+      aliveState: player.aliveState,
+      angle: player.angle,
+      velocityX: player.body.velocity.x,
+      velocityY: player.body.velocity.y,
     })
+  })
 
-    engine.game.world.bullets.forEach((bullet) => {
-      bullets[bullet.id] = new SnapshotBullet({
-        id: bullet.id,
-        position: {
-          x: bullet.body.position.x,
-          y: bullet.body.position.y,
-        },
-        playerId: bullet.playerId,
-      })
+  engine.game.world.bullets.forEach((bullet) => {
+    bullets.push({
+      id: bullet.id,
+      positionX: bullet.body.position.x,
+      positionY: bullet.body.position.y,
+      playerId: bullet.playerId,
     })
+  })
 
-    return new Snapshot({
-      frame: engine.frame,
-      bullets,
+  return {
+    id: engine.frame.toString(),
+    time: Date.now(),
+    state: {
       players,
-      next: null,
-    })
+      bullets,
+    },
   }
+}
 
-  // TODO fixme remove overrideLocal
-  public static syncEngineBySnapshot(
-    engine: Engine,
-    snapshot: Snapshot,
-    overrideLocal = false
-  ) {
-    engine.game.world.players.forEach((player) => {
-      const snapshotPlayer = snapshot.players[player.id]
+export const restoreEngineFromSnapshot = (
+  engine: Engine,
+  snapshot: Snapshot
+) => {
+  restorePlayersFromSnapshot(engine, snapshot.state.players)
+  restoreBulletsFromSnapshot(engine, snapshot.state.bullets)
 
-      if (!snapshotPlayer) {
-        return engine.game.world.removePlayer(player.id)
-      }
+  engine.frame = Number(snapshot.id)
+}
 
-      // TODO fixme remove overrideLocal
-      if (!overrideLocal && !player.isServerControlled) return
+export const restorePlayersFromSnapshot = (
+  engine: Engine,
+  players: Snapshot['state']['players']
+) => {
+  players.forEach((snapshotPlayer) => {
+    const enginePlayer = engine.game.world.getPlayerByID(snapshotPlayer.id)
 
-      console.log('!!!!! From snapshot: player angle -', snapshotPlayer.angle)
+    if (!enginePlayer) {
+      return
+    }
 
-      Matter.Body.setPosition(player.body, snapshotPlayer.position)
-      Matter.Body.setVelocity(player.body, snapshotPlayer.velocity)
-      Matter.Body.setAngle(player.body, degreesToRadian(player.angle))
-      Matter.Body.setAngularVelocity(
-        player.body,
-        snapshotPlayer.angularVelocity
-      )
-      player.angle = snapshotPlayer.angle
-      player.aliveState = snapshotPlayer.aliveState
-      player.bullets = snapshotPlayer.bullets
-    })
+    // Set player's alive state dirty if it has updated
+    if (enginePlayer.aliveState !== snapshotPlayer.aliveState) {
+      enginePlayer.hasSyncedAliveState = false
+    }
 
-    engine.game.world.bullets.forEach((bullet) => {
-      const snapshotBullet = snapshot.bullets[bullet.id]
+    enginePlayer.aliveState = snapshotPlayer.aliveState
+    enginePlayer.bullets = snapshotPlayer.bullets
 
-      if (!snapshotBullet) {
-        return engine.game.world.removeBullet(bullet.id)
-      }
+    // Do not update player by snapshot if it is not controlled by snapshots (by server)
+    if (!enginePlayer.isServerControlled) return
 
-      if (!bullet.isServerControlled) return
+    Matter.Body.setPosition(
+      enginePlayer.body,
+      Matter.Vector.create(snapshotPlayer.positionX, snapshotPlayer.positionY)
+    )
+    Matter.Body.setVelocity(
+      enginePlayer.body,
+      Matter.Vector.create(snapshotPlayer.velocityX, snapshotPlayer.velocityY)
+    )
+    Matter.Body.setAngle(enginePlayer.body, degreesToRadian(enginePlayer.angle))
+    Matter.Body.setAngularVelocity(enginePlayer.body, 0)
+    enginePlayer.angle = snapshotPlayer.angle
+  })
 
-      Matter.Body.setPosition(bullet.body, snapshotBullet.position)
-      Matter.Body.setVelocity(bullet.body, { x: 0, y: 0 })
-    })
+  return engine
+}
 
-    Object.values(snapshot.bullets).forEach((snapshotBullet) => {
-      if (engine.game.world.getBulletByID(snapshotBullet.id)) return
+export const restoreBulletsFromSnapshot = (
+  engine: Engine,
+  bullets: Snapshot['state']['bullets']
+) => {
+  bullets.forEach((snapshotBullet) => {
+    let engineBullet = engine.game.world.getBulletByID(snapshotBullet.id)
 
+    if (!engineBullet) {
       const player = engine.game.world.getPlayerByID(snapshotBullet.playerId)
 
-      if (!player) {
-        console.error(
-          `No player with ID "${snapshotBullet.playerId}" was found when trying to add bullet`
-        )
-        return
-      }
+      // TODO can be a state when a bullet was shot and player has already disconnected
+      if (!player) return
 
-      const bullet = engine.game.world.createBullet(player, snapshotBullet.id)
-      bullet.setServerControlled(true)
-      engine.game.world.addBullet(bullet)
-    })
+      engineBullet = new Bullet(snapshotBullet.id, player)
+      engineBullet.setServerControlled(true)
+      engine.game.world.addBullet(engineBullet)
+    }
 
-    engine.frame = snapshot.frame
+    // Do not update bullet by snapshot if it is not controlled by snapshots (by server)
+    if (!engineBullet.isServerControlled) return
+
+    Matter.Body.setPosition(
+      engineBullet.body,
+      Matter.Vector.create(snapshotBullet.positionX, snapshotBullet.positionY)
+    )
+  })
+
+  for (const engineBullet of engine.game.world.getAllBulletsIterator()) {
+    const snapshotBullet = bullets?.some((e) => e.id === engineBullet.id)
+
+    if (snapshotBullet) return
+
+    engine.game.world.removeBullet(engineBullet.id)
   }
 }

@@ -4,9 +4,10 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
+    "@geckos.io/snapshot-interpolation": "^1.1.0",
     "class-validator": "^0.13.2",
-    "typescript": "^5.1.6",
-    "colyseus": "^0.15.7"
+    "colyseus": "^0.15.7",
+    "typescript": "^5.1.6"
   },
   "devDependencies": {
     "rimraf": "^5.0.0"

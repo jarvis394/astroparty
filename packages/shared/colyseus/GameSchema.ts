@@ -57,6 +57,7 @@ export class SchemaBullet extends Schema {
 
 export class GameRoomState extends Schema {
   @type('int64') frame = 0
+  @type('int64') time = 0
   @type({ map: SchemaPlayer }) players: MapSchema<SchemaPlayer, string> =
     new MapSchema()
   @type({ map: SchemaBullet }) bullets: MapSchema<SchemaBullet, string> =
