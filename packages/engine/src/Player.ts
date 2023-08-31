@@ -1,6 +1,7 @@
 import World from './World'
 import Matter from 'matter-js'
 import { degreesToRadian, exhaustivnessCheck } from '@astroparty/shared/utils'
+import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
 import Bullet from './Bullet'
 import getAngleVector from './utils/getAngleVector'
 
@@ -12,6 +13,13 @@ export enum AliveState {
    */
   CRAFT_DESTROYED,
   DEAD,
+}
+
+export type PlayerConstructorProps = {
+  id: string
+  position: Matter.Vector
+  shipSprite: ShipSprite
+  world: World
 }
 
 class Player {
@@ -62,8 +70,9 @@ class Player {
   isBoosting: boolean
   /** Флаг для состояния, когда игрок обновляется по данным с сервера */
   isServerControlled: boolean
+  shipSprite: ShipSprite
 
-  constructor(id: string, position: Matter.Vector, world: World) {
+  constructor({ id, position, shipSprite, world }: PlayerConstructorProps) {
     this.id = id
     this.world = world
     this.body = Player.createBody(position)
@@ -79,6 +88,7 @@ class Player {
     this.isBoosting = false
     this.isServerControlled = false
     this.hasSyncedAliveState = true
+    this.shipSprite = shipSprite
 
     Matter.World.addBody(this.world.instance, this.body)
   }

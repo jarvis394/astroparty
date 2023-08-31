@@ -14,7 +14,7 @@ class Player extends PIXI.Container {
 
   constructor(enginePlayer: EnginePlayer) {
     super()
-    this.sprite = new PIXI.Sprite(Assets.get('ship_blue'))
+    this.sprite = new PIXI.Sprite(Assets.get(enginePlayer.shipSprite))
     this.enginePlayer = enginePlayer
     this.scale.set(Player.ALIVE_SCALE)
     this.rotation = enginePlayer.body.angle

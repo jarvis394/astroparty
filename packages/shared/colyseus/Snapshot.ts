@@ -144,7 +144,7 @@ export const restoreBulletsFromSnapshot = (
   for (const engineBullet of engine.game.world.getAllBulletsIterator()) {
     const snapshotBullet = bullets?.some((e) => e.id === engineBullet.id)
 
-    if (snapshotBullet) return
+    if (snapshotBullet || !engineBullet.isServerControlled) return
 
     engine.game.world.removeBullet(engineBullet.id)
   }

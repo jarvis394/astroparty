@@ -1,11 +1,9 @@
-import { Assets } from 'pixi.js'
 import React, { useRef } from 'react'
 import { Engine } from '@astroparty/engine'
 import Application from 'src/pixi/Application'
 import ScenesController from 'src/pixi/ScenesController'
 import { SCENES } from 'src/pixi/scenes'
-import shipBlueSprite from 'src/assets/ship.png'
-import bulletSprite from 'src/assets/bullet.png'
+import { loadAssets } from 'src/assets'
 import useMountEffect from 'src/hooks/useMountEffect'
 import MatterRender from '../MatterRender'
 
@@ -20,9 +18,7 @@ const App: React.FC = () => {
     const scenesController = new ScenesController(app, engine.current)
 
     const start = async () => {
-      Assets.add('ship_blue', shipBlueSprite)
-      Assets.add('bullet', bulletSprite)
-      await Assets.load(['ship_blue', 'bullet'])
+      await loadAssets()
       await scenesController.loadScene(SCENES.MainScene)
     }
 

@@ -31,6 +31,7 @@ export class GameRoom extends Room<GameRoomState> {
 		const schemaPlayer = new SchemaPlayer({
 			id: player.id,
 			position,
+			shipSprite: player.shipSprite,
 			velocity,
 		})
 		this.state.players.set(player.id, schemaPlayer)
@@ -77,13 +78,14 @@ export class GameRoom extends Room<GameRoomState> {
 		this.gameController.handleDash(client)
 	}
 
-	handleShoot(client: Client) {
-		const bullet = this.gameController.handleShoot(client)
+	handleShoot(client: Client, message: string | false) {
+		const bullet = this.gameController.handleShoot(client, message)
 
 		if (!bullet) return
 
 		const schemaPosition = new SchemaVector(bullet.body.position.x, bullet.body.position.y)
 		const schemaBullet = new SchemaBullet(bullet.id, bullet.playerId, schemaPosition)
 		this.state.bullets.set(schemaBullet.id, schemaBullet)
+		this.state.spawns.push(schemaBullet.id)
 	}
 }

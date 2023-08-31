@@ -109,7 +109,7 @@ class GameController {
 		player.dash()
 	}
 
-	handleShoot(client: Client): Bullet | false {
+	handleShoot(client: Client, localBulletId: string | false): Bullet | false {
 		const playerId = client.userData?.playerId
 		const player = this.engine.game.world.getPlayerByID(playerId)
 
@@ -122,6 +122,13 @@ class GameController {
 		// Player doesn't have bullets, ignore message
 		if (!bullet) {
 			return false
+		}
+
+		if (localBulletId !== false) {
+			client.send('shoot_ack', {
+				localBulletId,
+				serverBulletId: bullet.id,
+			})
 		}
 
 		return bullet
