@@ -1,17 +1,20 @@
 import Matter from 'matter-js'
-import Bullet from './Bullet'
+import Bullet, { BulletConstructorProps } from './Bullet'
 import Player, { AliveState } from './Player'
 import EventEmitter from './EventEmitter'
+import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
 
 export enum WorldEvents {
   BULLET_SPAWN = 'bullet_spawn',
   BULLET_DESPAWN = 'bullet_despawn',
+  PLAYER_SPAWN = 'player_spawn',
   PLAYER_DESPAWN = 'player_despawn',
 }
 
 type WorldEmitterEvents = {
   [WorldEvents.BULLET_SPAWN]: (bulletId: string) => void
   [WorldEvents.BULLET_DESPAWN]: (bulletId: string) => void
+  [WorldEvents.PLAYER_SPAWN]: (playerId: string) => void
   [WorldEvents.PLAYER_DESPAWN]: (playerId: string) => void
 }
 
@@ -86,23 +89,29 @@ class World extends EventEmitter<WorldEmitterEvents> {
       Matter.Vector.create(World.WORLD_WIDTH - 100, 100),
       Matter.Vector.create(100, World.WORLD_HEIGHT - 100),
     ]
+    const n = this.players.size % spawnPositions.length
 
-    return new Player(
+    return new Player({
       id,
-      spawnPositions[this.players.size % spawnPositions.length],
-      this
-    )
+      position: spawnPositions[n],
+      shipSprite: ShipSprite.BLUE,
+      world: this,
+    })
   }
 
-  public createBullet(
-    player: Player,
-    id: string = (this.bulletsShot + 1).toString()
-  ): Bullet {
-    return new Bullet(id, player)
+  public createBullet({
+    id = (this.bulletsShot + 1).toString(),
+    ...props
+  }: Omit<BulletConstructorProps, 'id'> & { id?: Player['id'] }): Bullet {
+    return new Bullet({
+      ...props,
+      id,
+    })
   }
 
   public addPlayer(player: Player): Player {
     this.players.set(player.id, player)
+    this.eventEmitter.emit(WorldEvents.PLAYER_SPAWN, player.id)
     return player
   }
 
@@ -166,7 +175,7 @@ class World extends EventEmitter<WorldEmitterEvents> {
       Matter.Bodies.rectangle(
         World.WORLD_WIDTH / 2,
         -World.WALL_HEIGHT / 2,
-        World.WORLD_WIDTH,
+        World.WORLD_WIDTH + World.WALL_HEIGHT * 2,
         World.WALL_HEIGHT,
         wallOptions
       ),
@@ -175,14 +184,14 @@ class World extends EventEmitter<WorldEmitterEvents> {
         -World.WALL_HEIGHT / 2,
         World.WORLD_HEIGHT / 2,
         World.WALL_HEIGHT,
-        World.WORLD_HEIGHT,
+        World.WORLD_HEIGHT + World.WALL_HEIGHT * 2,
         wallOptions
       ),
       // Bottom
       Matter.Bodies.rectangle(
         World.WORLD_WIDTH / 2,
         World.WORLD_HEIGHT + World.WALL_HEIGHT / 2,
-        World.WORLD_WIDTH,
+        World.WORLD_WIDTH + World.WALL_HEIGHT * 2,
         World.WALL_HEIGHT,
         wallOptions
       ),
@@ -191,7 +200,7 @@ class World extends EventEmitter<WorldEmitterEvents> {
         World.WORLD_WIDTH + World.WALL_HEIGHT / 2,
         World.WORLD_HEIGHT / 2,
         World.WALL_HEIGHT,
-        World.WORLD_HEIGHT,
+        World.WORLD_HEIGHT + World.WALL_HEIGHT * 2,
         wallOptions
       ),
     ]

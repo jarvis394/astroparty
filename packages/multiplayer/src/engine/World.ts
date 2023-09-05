@@ -1,6 +1,7 @@
 import { World } from '@astroparty/engine'
 import Matter from 'matter-js'
 import ServerPlayer from './Player'
+import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
 
 class ServerWorld extends World {
 	constructor({ matterEngine }: { matterEngine: Matter.Engine }) {
@@ -14,8 +15,15 @@ class ServerWorld extends World {
 			Matter.Vector.create(World.WORLD_WIDTH - 100, 100),
 			Matter.Vector.create(100, World.WORLD_HEIGHT - 100),
 		]
+		const shipSprites = [ShipSprite.BLUE, ShipSprite.RED, ShipSprite.PURPLE, ShipSprite.GREEN]
+		const n = this.players.size % spawnPositions.length
 
-		return new ServerPlayer(id, spawnPositions[this.players.size % spawnPositions.length], this)
+		return new ServerPlayer({
+			id,
+			position: spawnPositions[n],
+			shipSprite: shipSprites[n],
+			world: this,
+		})
 	}
 }
 

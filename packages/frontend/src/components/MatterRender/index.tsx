@@ -1,3 +1,4 @@
+import { World } from '@astroparty/engine'
 import Matter from 'matter-js'
 import React, { useEffect, useRef } from 'react'
 import useScreenDimensions from 'src/hooks/useScreenDimensions'
@@ -11,6 +12,16 @@ const MatterRender: React.FC<MatterRenderProps> = ({ engine }) => {
   const $root = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    const bounds = Matter.Bounds.create([
+      { x: 0, y: 0 },
+      { x: window.innerWidth, y: 0 },
+      { x: window.innerWidth, y: window.innerHeight },
+      { x: 0, y: window.innerHeight },
+    ])
+    Matter.Bounds.translate(bounds, {
+      x: -window.innerWidth / 2 + World.WORLD_WIDTH / 2,
+      y: -window.innerHeight / 2 + World.WORLD_HEIGHT / 2,
+    })
     const render = Matter.Render.create({
       element: $root.current || undefined,
       engine,
@@ -26,6 +37,7 @@ const MatterRender: React.FC<MatterRenderProps> = ({ engine }) => {
         showDebug: true,
         showVelocity: true,
       },
+      bounds,
     })
 
     Matter.Render.run(render)

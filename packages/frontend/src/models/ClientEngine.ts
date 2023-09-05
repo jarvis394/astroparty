@@ -1,5 +1,6 @@
 import {
   GameRoomState,
+  SchemaBullet,
   SchemaPlayer,
 } from '@astroparty/shared/colyseus/GameSchema'
 import {
@@ -9,7 +10,8 @@ import {
   restoreBulletsFromSnapshot,
   restorePlayersFromSnapshot,
 } from '@astroparty/shared/colyseus/Snapshot'
-import { EventEmitter, Engine, Player } from '@astroparty/engine'
+import map from '@astroparty/shared/utils/map'
+import { EventEmitter, Engine, Player, Bullet } from '@astroparty/engine'
 import Matter from 'matter-js'
 import {
   MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED,
@@ -77,46 +79,95 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     this.room.onMessage('init_room', this.handleInitRoom.bind(this))
     this.room.onMessage('player_join', this.handlePlayerJoin.bind(this))
     this.room.onMessage('player_left', this.handlePlayerLeft.bind(this))
+    this.room.onMessage('shoot_ack', this.handleShootAck.bind(this))
+  }
+
+  handleShootAck(message: {
+    localBulletId: Bullet['id']
+    serverBulletId: Bullet['id']
+    playerId: Player['id']
+    playerBulletsAmount: number
+  }) {
+    const engineBullet = this.engine.game.world.getBulletByID(
+      message.localBulletId
+    )
+    const enginePlayer = this.engine.game.world.getPlayerByID(message.playerId)
+
+    if (!engineBullet || !enginePlayer) return
+
+    engineBullet.setId(message.serverBulletId)
+    enginePlayer.bullets = message.playerBulletsAmount
+  }
+
+  reconcilePlayer(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
+    const player = this.engine.game.me
+
+    if (!player || player.isDashing) return
+
+    const serverPos = serverSnapshot.state.players.find(
+      (s) => s.id === this.playerId
+    )
+    const clientPos = playerSnapshot.state.players.find(
+      (s) => s.id === this.playerId
+    )
+
+    if (!clientPos || !serverPos) return
+
+    // Calculate the offset between server and client
+    const offsetX = clientPos?.positionX - serverPos?.positionX
+    const offsetY = clientPos?.positionY - serverPos?.positionY
+    const offsetAngle = clientPos?.angle - serverPos?.angle
+    const positionCorrectionCoeff =
+      200 - map(Math.max(Math.abs(offsetX), Math.abs(offsetY)), 0, 20, 20, 100)
+    const angleCorrectionCoeff = 200
+
+    // Apply a step by step correction of the player's position
+    Matter.Body.setPosition(
+      player.body,
+      Matter.Vector.create(
+        player.body.position.x - offsetX / positionCorrectionCoeff,
+        player.body.position.y - offsetY / positionCorrectionCoeff
+      )
+    )
+    player.angle -= offsetAngle / angleCorrectionCoeff
+  }
+
+  reconcileBullets(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
+    serverSnapshot.state.bullets.forEach((serverBullet) => {
+      const engineBullet = this.engine.game.world.getBulletByID(serverBullet.id)
+      const localBullet = playerSnapshot.state.bullets.find(
+        (bullet) => bullet.id === serverBullet.id
+      )
+
+      if (!engineBullet || !localBullet) return
+
+      const offsetX = localBullet.positionX - serverBullet.positionX
+      const offsetY = localBullet.positionY - serverBullet.positionY
+      const correctionCoeff = 20
+
+      Matter.Body.setPosition(
+        engineBullet.body,
+        Matter.Vector.create(
+          engineBullet.body.position.x - offsetX / correctionCoeff,
+          engineBullet.body.position.y - offsetY / correctionCoeff
+        )
+      )
+      Matter.Body.setAngle(engineBullet.body, serverBullet.angle)
+    })
   }
 
   serverReconciliation() {
-    const player = this.engine.game.me
+    // Get latest snapshot from the server
+    const serverSnapshot = this.snapshots.vault.get() as Snapshot | undefined
+    // Get closest player snapshot that matches server's snapshot time
+    const playerSnapshot = this.clientSnapshotsVault.get(
+      (serverSnapshot?.time || Date.now()) + Engine.MIN_DELTA * 3,
+      true
+    ) as Snapshot | undefined
 
-    if (player) {
-      // Get latest snapshot from the server
-      const serverSnapshot = this.snapshots.vault.get() as Snapshot | undefined
-      // Get closest player snapshot that matches server's snapshot time
-      const playerSnapshot = this.clientSnapshotsVault.get(
-        serverSnapshot?.time || Date.now(),
-        true
-      ) as Snapshot | undefined
-
-      if (serverSnapshot && playerSnapshot) {
-        const serverPos = serverSnapshot.state.players.find(
-          (s) => s.id === this.playerId
-        )
-        const clientPos = playerSnapshot.state.players.find(
-          (s) => s.id === this.playerId
-        )
-
-        if (!clientPos || !serverPos) return
-
-        // Calculate the offset between server and client
-        const offsetX = clientPos?.positionX - serverPos?.positionX
-        const offsetY = clientPos?.positionY - serverPos?.positionY
-        const offsetAngle = clientPos?.angle - serverPos?.angle
-        const correction = 60
-
-        // Apply a step by step correction of the player's position
-        Matter.Body.setPosition(
-          player.body,
-          Matter.Vector.create(
-            player.body.position.x - offsetX / correction,
-            player.body.position.y - offsetY / correction
-          )
-        )
-        player.angle -= offsetAngle / correction
-      }
+    if (serverSnapshot && playerSnapshot) {
+      this.reconcilePlayer(serverSnapshot, playerSnapshot)
+      this.reconcileBullets(serverSnapshot, playerSnapshot)
     }
   }
 
@@ -145,12 +196,13 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   handleInitRoom(state: GameRoomState) {
     this.engine.frame = 0
 
-    Object.values(state.players).forEach((serverPlayer) => {
-      const player = new Player(
-        serverPlayer.id,
-        serverPlayer.position,
-        this.engine.game.world
-      )
+    Object.values(state.players).forEach((serverPlayer: SchemaPlayer) => {
+      const player = new Player({
+        id: serverPlayer.id,
+        position: serverPlayer.position,
+        shipSprite: serverPlayer.shipSprite,
+        world: this.engine.game.world,
+      })
       player.angle = serverPlayer.angle
       player.aliveState = serverPlayer.aliveState
       player.bullets = serverPlayer.bullets
@@ -168,7 +220,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       }
     })
 
-    Object.values(state.bullets).forEach((serverBullet) => {
+    Object.values(state.bullets).forEach((serverBullet: SchemaBullet) => {
       const player = this.engine.game.world.getPlayerByID(serverBullet.playerId)
 
       if (!player) {
@@ -178,10 +230,13 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         return
       }
 
-      const bullet = this.engine.game.world.createBullet(
-        player,
-        serverBullet.id
-      )
+      const bullet = this.engine.game.world.createBullet({
+        id: serverBullet.id,
+        playerId: player.id,
+        playerPosition: player.body.position,
+        angle: serverBullet.angle,
+        world: player.world,
+      })
       bullet.setServerControlled(true)
       this.engine.game.world.addBullet(bullet)
     })
@@ -194,11 +249,12 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
     console.log('player_join', serverPlayer)
 
-    const player = new Player(
-      serverPlayer.id,
-      serverPlayer.position,
-      this.engine.game.world
-    )
+    const player = new Player({
+      id: serverPlayer.id,
+      position: serverPlayer.position,
+      shipSprite: serverPlayer.shipSprite,
+      world: this.engine.game.world,
+    })
     player.angle = serverPlayer.angle
     player.aliveState = serverPlayer.aliveState
     player.bullets = serverPlayer.bullets
@@ -236,6 +292,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         playerId: bullet.playerId,
         positionX: bullet.body.position.x,
         positionY: bullet.body.position.y,
+        angle: bullet.body.angle,
       })
     }
 
@@ -272,6 +329,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         playerId: bullet.playerId,
         positionX: bullet.position.x,
         positionY: bullet.position.y,
+        angle: bullet.angle,
       })
     )
 
@@ -318,11 +376,13 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         break
       }
       // Выстрел
-      case 'Space':
+      case 'Space': {
         if (this.isHoldingShootButton) return
-        this.room?.send('shoot')
+        const bullet = this.engine.game.me.shoot()
+        this.room?.send('shoot', bullet && bullet.id)
         this.isHoldingShootButton = true
         break
+      }
     }
   }
 

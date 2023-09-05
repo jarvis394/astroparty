@@ -1,8 +1,8 @@
-import { Player, World } from '@astroparty/engine'
+import { Player, PlayerConstructorProps, World } from '@astroparty/engine'
 
 class ServerPlayer extends Player {
-	constructor(id: string, position: Matter.Vector, world: World) {
-		super(id, position, world)
+	constructor(props: PlayerConstructorProps) {
+		super(props)
 
 		this.isServerControlled = true
 	}

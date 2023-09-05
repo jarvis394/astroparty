@@ -16,6 +16,7 @@ export type SnapshotPlayer = {
 
 export type SnapshotBullet = {
   id: string
+  angle: number
   playerId: string
   positionX: number
   positionY: number
@@ -52,6 +53,7 @@ export const generateSnapshot = (engine: Engine): Snapshot => {
       id: bullet.id,
       positionX: bullet.body.position.x,
       positionY: bullet.body.position.y,
+      angle: bullet.body.angle,
       playerId: bullet.playerId,
     })
   })
@@ -93,7 +95,11 @@ export const restorePlayersFromSnapshot = (
     }
 
     enginePlayer.aliveState = snapshotPlayer.aliveState
-    enginePlayer.bullets = snapshotPlayer.bullets
+
+    // We update local player's bullets in `shoot_ack` event
+    if (!enginePlayer.isMe) {
+      enginePlayer.bullets = snapshotPlayer.bullets
+    }
 
     // Do not update player by snapshot if it is not controlled by snapshots (by server)
     if (!enginePlayer.isServerControlled) return
@@ -127,7 +133,19 @@ export const restoreBulletsFromSnapshot = (
       // TODO can be a state when a bullet was shot and player has already disconnected
       if (!player) return
 
-      engineBullet = new Bullet(snapshotBullet.id, player)
+      // Do not recreate bullet if it is removed in client engine
+      // We handle all bullets with local playerId locally (with client engine)
+      if (snapshotBullet.playerId === engine.game.me?.id) {
+        return
+      }
+
+      engineBullet = new Bullet({
+        id: snapshotBullet.id,
+        playerId: player.id,
+        playerPosition: player.body.position,
+        angle: player.body.angle,
+        world: player.world,
+      })
       engineBullet.setServerControlled(true)
       engine.game.world.addBullet(engineBullet)
     }
@@ -139,12 +157,13 @@ export const restoreBulletsFromSnapshot = (
       engineBullet.body,
       Matter.Vector.create(snapshotBullet.positionX, snapshotBullet.positionY)
     )
+    Matter.Body.setAngle(engineBullet.body, snapshotBullet.angle)
   })
 
   for (const engineBullet of engine.game.world.getAllBulletsIterator()) {
     const snapshotBullet = bullets?.some((e) => e.id === engineBullet.id)
 
-    if (snapshotBullet) return
+    if (snapshotBullet || !engineBullet.isServerControlled) continue
 
     engine.game.world.removeBullet(engineBullet.id)
   }

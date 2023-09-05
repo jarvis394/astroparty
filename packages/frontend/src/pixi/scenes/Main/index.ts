@@ -28,10 +28,10 @@ class MainScene extends PIXIObject {
     this.playerId = params.get('id')
     this.clientEngine = new ClientEngine(engine, this.playerId)
 
-    // this.position.set(
-    //   window.innerWidth / 2 - World.WORLD_WIDTH / 2,
-    //   window.innerHeight / 2 - World.WORLD_HEIGHT / 2
-    // )
+    this.position.set(
+      window.innerWidth / 2 - World.WORLD_WIDTH / 2,
+      window.innerHeight / 2 - World.WORLD_HEIGHT / 2
+    )
 
     for (const player of this.clientEngine.engine.game.world.getAllPlayersIterator()) {
       const pixiPlayer = new Player(player)
