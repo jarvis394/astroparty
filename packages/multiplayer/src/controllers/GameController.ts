@@ -128,6 +128,8 @@ class GameController {
 			client.send('shoot_ack', {
 				localBulletId,
 				serverBulletId: bullet.id,
+				playerId: player.id,
+				playerBulletsAmount: player.bullets,
 			})
 		}
 

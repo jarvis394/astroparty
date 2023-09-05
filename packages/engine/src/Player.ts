@@ -124,7 +124,12 @@ class Player {
       return false
     }
 
-    const bullet = this.world.createBullet(this)
+    const bullet = this.world.createBullet({
+      playerId: this.id,
+      playerPosition: this.body.position,
+      angle: this.body.angle,
+      world: this.world,
+    })
     this.world.addBullet(bullet)
     this.bullets -= 1
 

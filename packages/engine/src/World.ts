@@ -1,5 +1,5 @@
 import Matter from 'matter-js'
-import Bullet from './Bullet'
+import Bullet, { BulletConstructorProps } from './Bullet'
 import Player, { AliveState } from './Player'
 import EventEmitter from './EventEmitter'
 import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
@@ -99,11 +99,14 @@ class World extends EventEmitter<WorldEmitterEvents> {
     })
   }
 
-  public createBullet(
-    player: Player,
-    id: string = (this.bulletsShot + 1).toString()
-  ): Bullet {
-    return new Bullet(id, player)
+  public createBullet({
+    id = (this.bulletsShot + 1).toString(),
+    ...props
+  }: Omit<BulletConstructorProps, 'id'> & { id?: Player['id'] }): Bullet {
+    return new Bullet({
+      ...props,
+      id,
+    })
   }
 
   public addPlayer(player: Player): Player {

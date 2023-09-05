@@ -45,14 +45,20 @@ export class SchemaPlayer extends Schema {
 export class SchemaBullet extends Schema {
   @type('string') id: string
   @type('string') playerId: string
+  @type('float64') angle: number
   @type(SchemaVector) position: SchemaVector
-  @type(SchemaVector) velocity = new SchemaVector(0, 0)
 
-  constructor(id: string, playerId: string, position: SchemaVector) {
+  constructor(
+    id: string,
+    playerId: string,
+    position: SchemaVector,
+    angle: number
+  ) {
     super()
     this.id = id
     this.playerId = playerId
     this.position = position
+    this.angle = angle
   }
 }
 

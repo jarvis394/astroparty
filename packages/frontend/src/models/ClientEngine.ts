@@ -11,7 +11,7 @@ import {
   restorePlayersFromSnapshot,
 } from '@astroparty/shared/colyseus/Snapshot'
 import map from '@astroparty/shared/utils/map'
-import { EventEmitter, Engine, Player } from '@astroparty/engine'
+import { EventEmitter, Engine, Player, Bullet } from '@astroparty/engine'
 import Matter from 'matter-js'
 import {
   MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED,
@@ -57,7 +57,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         this.handleKeyDown(keyCode)
       })
 
-      console.log(this.engine.game.world.bullets)
       const snapshot = this.generateSnapshotForClientEngine()
       snapshot && this.clientSnapshotsVault.add(snapshot)
     })
@@ -83,15 +82,21 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     this.room.onMessage('shoot_ack', this.handleShootAck.bind(this))
   }
 
-  handleShootAck(message: { localBulletId: string; serverBulletId: string }) {
+  handleShootAck(message: {
+    localBulletId: Bullet['id']
+    serverBulletId: Bullet['id']
+    playerId: Player['id']
+    playerBulletsAmount: number
+  }) {
     const engineBullet = this.engine.game.world.getBulletByID(
       message.localBulletId
     )
-    console.log(message, engineBullet, this.engine.game.world.bullets)
-    console.log('!!!!', this.engine.game.world)
-    if (!engineBullet) return
+    const enginePlayer = this.engine.game.world.getPlayerByID(message.playerId)
 
-    engineBullet.id = message.serverBulletId
+    if (!engineBullet || !enginePlayer) return
+
+    engineBullet.setId(message.serverBulletId)
+    enginePlayer.bullets = message.playerBulletsAmount
   }
 
   reconcilePlayer(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
@@ -147,6 +152,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
           engineBullet.body.position.y - offsetY / correctionCoeff
         )
       )
+      Matter.Body.setAngle(engineBullet.body, serverBullet.angle)
     })
   }
 
@@ -224,10 +230,13 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         return
       }
 
-      const bullet = this.engine.game.world.createBullet(
-        player,
-        serverBullet.id
-      )
+      const bullet = this.engine.game.world.createBullet({
+        id: serverBullet.id,
+        playerId: player.id,
+        playerPosition: player.body.position,
+        angle: serverBullet.angle,
+        world: player.world,
+      })
       bullet.setServerControlled(true)
       this.engine.game.world.addBullet(bullet)
     })
@@ -283,6 +292,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         playerId: bullet.playerId,
         positionX: bullet.body.position.x,
         positionY: bullet.body.position.y,
+        angle: bullet.body.angle,
       })
     }
 
@@ -319,6 +329,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         playerId: bullet.playerId,
         positionX: bullet.position.x,
         positionY: bullet.position.y,
+        angle: bullet.angle,
       })
     )
 
@@ -368,7 +379,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       case 'Space': {
         if (this.isHoldingShootButton) return
         const bullet = this.engine.game.me.shoot()
-        console.log('pressed space:', bullet)
         this.room?.send('shoot', bullet && bullet.id)
         this.isHoldingShootButton = true
         break

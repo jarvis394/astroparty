@@ -84,7 +84,7 @@ export class GameRoom extends Room<GameRoomState> {
 		if (!bullet) return
 
 		const schemaPosition = new SchemaVector(bullet.body.position.x, bullet.body.position.y)
-		const schemaBullet = new SchemaBullet(bullet.id, bullet.playerId, schemaPosition)
+		const schemaBullet = new SchemaBullet(bullet.id, bullet.playerId, schemaPosition, bullet.body.angle)
 		this.state.bullets.set(schemaBullet.id, schemaBullet)
 		this.state.spawns.push(schemaBullet.id)
 	}

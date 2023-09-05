@@ -72,8 +72,6 @@ class MainScene extends PIXIObject {
   handleBulletSpawn(bulletId: string) {
     const bullet = this.engine.game.world.bullets.get(bulletId)
 
-    console.log('spawn bullet:', bulletId, bullet)
-
     if (!bullet) {
       throw new Error(
         `В событии BULLET_SPAWN передан несуществующий id: ${bulletId}`

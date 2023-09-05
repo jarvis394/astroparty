@@ -3,6 +3,14 @@ import World from './World'
 import Matter from 'matter-js'
 import Player from './Player'
 
+export type BulletConstructorProps = {
+  id: string
+  angle: number
+  playerPosition: Matter.Vector
+  playerId: Player['id']
+  world: World
+}
+
 class Bullet {
   public static RADIUS = 4
   public static VELOCITY = 10
@@ -12,20 +20,35 @@ class Bullet {
   playerId: string
   world: World
   body: Matter.Body
-  /** Флаг для состояния, когда игрок обновляется по данным с сервера */
+  /** Флаг для состояния, когда пулька обновляется по данным с сервера */
   isServerControlled: boolean
+  isAcknowledgedByServer: boolean
 
-  constructor(id: string, player: Player) {
+  constructor({
+    id,
+    angle,
+    playerPosition,
+    playerId,
+    world,
+  }: BulletConstructorProps) {
     this.id = id
-    this.playerId = player.id
-    this.world = player.world
-    this.body = Bullet.createBody(player.body)
+    this.playerId = playerId
+    this.world = world
+    this.body = Bullet.createBody({ angle, playerPosition })
     this.body.label = Bullet.getLabelFromId(id)
     this.isServerControlled = false
+    this.isAcknowledgedByServer = false
+  }
+
+  public setId(id: Bullet['id']) {
+    this.id = id
+    this.body.label = Bullet.getLabelFromId(id)
   }
 
   public update() {
-    !this.isServerControlled && this.forward()
+    if (this.isServerControlled) return
+
+    this.forward()
   }
 
   private forward() {
@@ -51,12 +74,15 @@ class Bullet {
     return body.label.startsWith(Bullet.LABEL_PREFIX)
   }
 
-  public static createBody(playerBody: Matter.Body): Matter.Body {
+  public static createBody({
+    angle,
+    playerPosition,
+  }: Pick<BulletConstructorProps, 'angle' | 'playerPosition'>): Matter.Body {
     const position = Matter.Vector.add(
-      playerBody.position,
+      playerPosition,
       Matter.Vector.rotate(
         Matter.Vector.create(Player.HITBOX_RADIUS + Bullet.RADIUS, 0),
-        playerBody.angle
+        angle
       )
     )
 
@@ -67,7 +93,7 @@ class Bullet {
       frictionAir: 0,
       restitution: 1,
       isSensor: true,
-      angle: playerBody.angle,
+      angle: angle,
     })
   }
 }
