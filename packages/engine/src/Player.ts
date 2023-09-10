@@ -273,6 +273,7 @@ class Player {
       collisionFilter: {
         category: Player.PLAYER_COLLISION_CATEGORY,
       },
+      mass: 1,
     })
   }
 }

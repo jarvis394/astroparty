@@ -2,6 +2,7 @@ import Game from './Game'
 import Matter from 'matter-js'
 import Loop from 'mainloop.js'
 import Player from './Player'
+import MatterAttractors from './lib/matterAttractors'
 
 class Engine {
   static MIN_FPS = 60
@@ -47,6 +48,10 @@ class Engine {
     return Date.now()
   }
 
+  private initMatterPlugins() {
+    Matter.use(MatterAttractors as unknown as Matter.Plugin)
+  }
+
   public update(delta: number) {
     Matter.Engine.update(this.matterEngine, delta)
     this.game.update()
@@ -56,6 +61,8 @@ class Engine {
   }
 
   public start() {
+    this.initMatterPlugins()
+
     Loop.setSimulationTimestep(Engine.MIN_DELTA)
     Loop.setUpdate(this.update.bind(this)).start()
   }

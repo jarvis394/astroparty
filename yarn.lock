@@ -6073,6 +6073,11 @@ map-obj@^4.0.0:
   resolved "https://registry.npmjs.org/map-obj/-/map-obj-4.3.0.tgz"
   integrity sha512-hdN1wVrZbb29eBGiGjJbeP8JbKjq1urkHJ/LIP/NY48MZ1QVXUsQBV1G1zvYFHn1XE06cwjBsOI2K3Ulnj1YXQ==
 
+matter-attractors@^0.1.6:
+  version "0.1.6"
+  resolved "https://registry.yarnpkg.com/matter-attractors/-/matter-attractors-0.1.6.tgz#f87ba132fb6cf1e58f267c6d8ffc590768683989"
+  integrity sha512-vGFsFHS9m0hXnaswfKXT2nKfPXJs4lwnQJwkGrs1IHrVldKAmlBKBb4OcYh0rwQga3CFWGUq3JvKpWZvZuqlDQ==
+
 matter-js@^0.19.0:
   version "0.19.0"
   resolved "https://registry.npmjs.org/matter-js/-/matter-js-0.19.0.tgz"

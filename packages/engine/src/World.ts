@@ -3,6 +3,7 @@ import Bullet, { BulletConstructorProps } from './Bullet'
 import Player, { AliveState } from './Player'
 import EventEmitter from './EventEmitter'
 import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
+import AttractionSphere from './AttractionSphere'
 
 export enum WorldEvents {
   BULLET_SPAWN = 'bullet_spawn',
@@ -27,6 +28,7 @@ class World extends EventEmitter<WorldEmitterEvents> {
 
   instance: Matter.World
   walls: Matter.Body[]
+  attractors: AttractionSphere[]
   bullets: Map<string, Bullet> = new Map()
   players: Map<string, Player> = new Map()
   // TODO: убрать, юзать айдишники из бд
@@ -38,6 +40,16 @@ class World extends EventEmitter<WorldEmitterEvents> {
     this.instance = matterEngine.world
     this.walls = this.addWorldWalls()
     this.addObstacles()
+    this.attractors = [
+      new AttractionSphere(
+        { x: World.WORLD_WIDTH / 4, y: World.WORLD_HEIGHT / 2 },
+        this
+      ),
+      new AttractionSphere(
+        { x: (World.WORLD_WIDTH / 4) * 3, y: World.WORLD_HEIGHT / 2 },
+        this
+      ),
+    ]
 
     Matter.Events.on(matterEngine, 'collisionStart', (event) => {
       for (const { bodyA, bodyB } of event.pairs) {

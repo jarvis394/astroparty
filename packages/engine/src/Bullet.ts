@@ -92,6 +92,7 @@ class Bullet {
       frictionStatic: 0,
       frictionAir: 0,
       restitution: 1,
+      mass: 10,
       isSensor: true,
       angle: angle,
     })
