@@ -4,6 +4,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
+    "@astroparty/engine": "^1.0.0",
     "@geckos.io/snapshot-interpolation": "^1.1.0",
     "class-validator": "^0.13.2",
     "colyseus": "^0.15.7",

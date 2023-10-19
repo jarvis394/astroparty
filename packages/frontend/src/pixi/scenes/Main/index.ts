@@ -5,11 +5,8 @@ import PIXIObject from 'src/pixi/PIXIObject'
 import Bullet from 'src/pixi/components/Bullet'
 import { Graphics } from 'pixi.js'
 import { ClientEngine, ClientEngineEvents } from 'src/models/ClientEngine'
-import {
-  GameRoomState,
-  SchemaPlayer,
-} from '@astroparty/shared/colyseus/GameSchema'
 import Debug from 'src/pixi/components/Debug'
+import { Snapshot, SnapshotPlayer } from '@astroparty/shared/game/Snapshot'
 
 class MainScene extends PIXIObject {
   app: Application
@@ -106,10 +103,10 @@ class MainScene extends PIXIObject {
     this.removeChild(bullet)
   }
 
-  handleInitRoom(state: GameRoomState) {
+  handleInitRoom(snapshot: Snapshot) {
     if (!this.playerId) return
 
-    Object.values(state.players).forEach((serverPlayer) => {
+    Object.values(snapshot.state.players).forEach((serverPlayer) => {
       const enginePlayer = this.clientEngine.engine.game.world.getPlayerByID(
         serverPlayer.id
       )
@@ -125,7 +122,7 @@ class MainScene extends PIXIObject {
       this.addChild(pixiPlayer)
     })
 
-    Object.values(state.bullets).forEach((serverBullet) => {
+    Object.values(snapshot.state.bullets).forEach((serverBullet) => {
       const engineBullet = this.clientEngine.engine.game.world.getBulletByID(
         serverBullet.id
       )
@@ -142,7 +139,7 @@ class MainScene extends PIXIObject {
     })
   }
 
-  handlePlayerJoin(serverPlayer: SchemaPlayer) {
+  handlePlayerJoin(serverPlayer: SnapshotPlayer) {
     if (!this.playerId) return
 
     const enginePlayer = this.clientEngine.engine.game.world.getPlayerByID(

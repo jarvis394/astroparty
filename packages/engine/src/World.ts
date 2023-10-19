@@ -57,7 +57,7 @@ class World extends EventEmitter<WorldEmitterEvents> {
           Matter.World.remove(this.instance, a)
           this.eventEmitter.emit(WorldEvents.BULLET_DESPAWN, bulletId)
           if (player.aliveState === AliveState.ALIVE) {
-            player.makeCraftDestroyed()
+            player.aliveState = AliveState.CRAFT_DESTROYED
           }
           return this.bullets.delete(bulletId)
         }

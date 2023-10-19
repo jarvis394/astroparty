@@ -1,23 +1,22 @@
 import {
-  GameRoomState,
-  SchemaBullet,
-  SchemaPlayer,
-} from '@astroparty/shared/colyseus/GameSchema'
-import {
   Snapshot,
   SnapshotBullet,
   SnapshotPlayer,
   restoreBulletsFromSnapshot,
   restorePlayersFromSnapshot,
-} from '@astroparty/shared/colyseus/Snapshot'
-import map from '@astroparty/shared/utils/map'
-import { EventEmitter, Engine, Player, Bullet } from '@astroparty/engine'
-import Matter from 'matter-js'
+} from '@astroparty/shared/game/Snapshot'
 import {
-  MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED,
-  WS_HOSTNAME,
-} from 'src/config/constants'
-import * as Colyseus from 'colyseus.js'
+  GameEvents,
+  InitEventMessage,
+  PlayerJoinEventMessage,
+  PlayerLeftEventMessage,
+  ShootAckEventMessage,
+} from '@astroparty/shared/types/GameEvents'
+import map from '@astroparty/shared/utils/map'
+import { EventEmitter, Engine, Player } from '@astroparty/engine'
+import Matter from 'matter-js'
+import { MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED } from 'src/config/constants'
+import geckos, { ClientChannel } from '@geckos.io/client'
 import { SnapshotInterpolation, Vault } from '@geckos.io/snapshot-interpolation'
 
 export enum ClientEngineEvents {
@@ -27,17 +26,16 @@ export enum ClientEngineEvents {
 }
 
 type ClientEngineEmitterEvents = {
-  [ClientEngineEvents.INIT_ROOM]: (state: GameRoomState) => void
-  [ClientEngineEvents.PLAYER_JOIN]: (player: SchemaPlayer) => void
+  [ClientEngineEvents.INIT_ROOM]: (state: Snapshot) => void
+  [ClientEngineEvents.PLAYER_JOIN]: (player: SnapshotPlayer) => void
   [ClientEngineEvents.PLAYER_LEFT]: (playerId: Player['id']) => void
 }
 
 export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   snapshots: SnapshotInterpolation
   clientSnapshotsVault: Vault
-  client: Colyseus.Client
   engine: Engine
-  room?: Colyseus.Room<GameRoomState>
+  channel: ClientChannel
   playerId: string | null
   keysPressed: Set<string> = new Set()
   private isHoldingShootButton = false
@@ -47,7 +45,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     this.snapshots = new SnapshotInterpolation(Engine.MIN_FPS)
     this.clientSnapshotsVault = new Vault()
     this.engine = engine
-    this.client = new Colyseus.Client(WS_HOSTNAME)
+    this.channel = geckos()
     this.playerId = playerId
   }
 
@@ -68,26 +66,28 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   async startGame() {
     if (!this.playerId) return
 
-    this.room = await this.client.joinOrCreate<GameRoomState>('game', {
-      playerId: this.playerId,
-    })
+    this.channel.onConnect(() => {
+      console.log('connected', this.channel)
 
-    this.room.onStateChange((state) => {
-      this.handleRoomStateChange(state)
+      this.channel.on(GameEvents.INIT, (message) => {
+        this.handleInitRoom(message as InitEventMessage)
+      })
+      this.channel.on(GameEvents.UPDATE, (message) => {
+        this.handleRoomStateChange(message as Snapshot)
+      })
+      this.channel.on(GameEvents.SHOOT_ACK, (message) => {
+        this.handleShootAck(message as ShootAckEventMessage)
+      })
+      this.channel.on(GameEvents.PLAYER_JOIN, (message) => {
+        this.handlePlayerJoin(message as PlayerJoinEventMessage)
+      })
+      this.channel.on(GameEvents.PLAYER_LEFT, (message) => {
+        this.handlePlayerLeft(message as PlayerLeftEventMessage)
+      })
     })
-
-    this.room.onMessage('init_room', this.handleInitRoom.bind(this))
-    this.room.onMessage('player_join', this.handlePlayerJoin.bind(this))
-    this.room.onMessage('player_left', this.handlePlayerLeft.bind(this))
-    this.room.onMessage('shoot_ack', this.handleShootAck.bind(this))
   }
 
-  handleShootAck(message: {
-    localBulletId: Bullet['id']
-    serverBulletId: Bullet['id']
-    playerId: Player['id']
-    playerBulletsAmount: number
-  }) {
+  handleShootAck(message: ShootAckEventMessage) {
     const engineBullet = this.engine.game.world.getBulletByID(
       message.localBulletId
     )
@@ -119,7 +119,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     const offsetAngle = clientPos?.angle - serverPos?.angle
     const positionCorrectionCoeff =
       200 - map(Math.max(Math.abs(offsetX), Math.abs(offsetY)), 0, 20, 20, 100)
-    const angleCorrectionCoeff = 200
+    const angleCorrectionCoeff = 10
 
     // Apply a step by step correction of the player's position
     Matter.Body.setPosition(
@@ -161,7 +161,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     const serverSnapshot = this.snapshots.vault.get() as Snapshot | undefined
     // Get closest player snapshot that matches server's snapshot time
     const playerSnapshot = this.clientSnapshotsVault.get(
-      (serverSnapshot?.time || Date.now()) + Engine.MIN_DELTA * 3,
+      serverSnapshot?.time || Date.now(),
       true
     ) as Snapshot | undefined
 
@@ -193,13 +193,13 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     bullets && restoreBulletsFromSnapshot(this.engine, bullets)
   }
 
-  handleInitRoom(state: GameRoomState) {
+  handleInitRoom({ snapshot, playerId }: InitEventMessage) {
     this.engine.frame = 0
 
-    Object.values(state.players).forEach((serverPlayer: SchemaPlayer) => {
+    Object.values(snapshot.state.players).forEach((serverPlayer) => {
       const player = new Player({
         id: serverPlayer.id,
-        position: serverPlayer.position,
+        position: { x: serverPlayer.positionX, y: serverPlayer.positionY },
         shipSprite: serverPlayer.shipSprite,
         world: this.engine.game.world,
       })
@@ -207,20 +207,23 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       player.aliveState = serverPlayer.aliveState
       player.bullets = serverPlayer.bullets
 
-      if (MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
-        player.setServerControlled(true)
-      } else {
-        player.setServerControlled(this.playerId !== serverPlayer.id)
-      }
-
       this.engine.addPlayer(player)
 
-      if (this.playerId === serverPlayer.id) {
+      // Server sends current channel's playerId in INIT event,
+      // if player matches that ID, then set that player as local player
+      if (
+        playerId === serverPlayer.id &&
+        !MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED
+      ) {
+        this.playerId = playerId
         this.engine.game.setMe(player)
+        player.setServerControlled(false)
+      } else {
+        player.setServerControlled(true)
       }
     })
 
-    Object.values(state.bullets).forEach((serverBullet: SchemaBullet) => {
+    Object.values(snapshot.state.bullets).forEach((serverBullet) => {
       const player = this.engine.game.world.getPlayerByID(serverBullet.playerId)
 
       if (!player) {
@@ -241,17 +244,17 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       this.engine.game.world.addBullet(bullet)
     })
 
-    this.eventEmitter.emit(ClientEngineEvents.INIT_ROOM, state)
+    this.eventEmitter.emit(ClientEngineEvents.INIT_ROOM, snapshot)
   }
 
-  handlePlayerJoin(serverPlayer: SchemaPlayer) {
+  handlePlayerJoin(serverPlayer: SnapshotPlayer) {
     if (!this.playerId) return
 
     console.log('player_join', serverPlayer)
 
     const player = new Player({
       id: serverPlayer.id,
-      position: serverPlayer.position,
+      position: { x: serverPlayer.positionX, y: serverPlayer.positionY },
       shipSprite: serverPlayer.shipSprite,
       world: this.engine.game.world,
     })
@@ -279,6 +282,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       angle: me.angle,
       aliveState: me.aliveState,
       bullets: me.bullets,
+      shipSprite: me.shipSprite,
       positionX: me.body.position.x,
       positionY: me.body.position.y,
       velocityX: me.body.velocity.x,
@@ -306,41 +310,8 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     }
   }
 
-  handleRoomStateChange(state: GameRoomState) {
-    const players: SnapshotPlayer[] = []
-    const bullets: SnapshotBullet[] = []
-
-    state.players.forEach((player) =>
-      players.push({
-        id: player.id,
-        angle: player.angle,
-        aliveState: player.aliveState,
-        bullets: player.bullets,
-        positionX: player.position.x,
-        positionY: player.position.y,
-        velocityX: player.velocity.x,
-        velocityY: player.velocity.y,
-      })
-    )
-
-    state.bullets.forEach((bullet) =>
-      bullets.push({
-        id: bullet.id,
-        playerId: bullet.playerId,
-        positionX: bullet.position.x,
-        positionY: bullet.position.y,
-        angle: bullet.angle,
-      })
-    )
-
-    this.snapshots.vault.add({
-      id: state.frame.toString(),
-      time: Date.now(),
-      state: {
-        players,
-        bullets,
-      },
-    })
+  handleRoomStateChange(snapshot: Snapshot) {
+    this.snapshots.vault.add(snapshot)
   }
 
   handleKeyDown(keyCode: string) {
@@ -351,10 +322,16 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       case 'ArrowRight': {
         if (this.engine.game.me?.isRotating) return
 
-        this.room?.send('rotate', {
-          action: 'start',
-          frame: this.engine.frame,
-        })
+        this.channel.emit(
+          GameEvents.ROTATE,
+          {
+            action: 'start',
+            frame: this.engine.frame,
+          },
+          {
+            reliable: true,
+          }
+        )
 
         this.engine.game.me.isRotating = true
         break
@@ -368,7 +345,9 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
           return
         }
 
-        this.room?.send('dash')
+        this.channel?.emit(GameEvents.DASH, null, {
+          reliable: true,
+        })
 
         if (!MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
           this.engine.game.me.dash()
@@ -379,7 +358,9 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       case 'Space': {
         if (this.isHoldingShootButton) return
         const bullet = this.engine.game.me.shoot()
-        this.room?.send('shoot', bullet && bullet.id)
+        this.channel?.emit(GameEvents.SHOOT, bullet ? bullet.id : undefined, {
+          reliable: true,
+        })
         this.isHoldingShootButton = true
         break
       }
@@ -398,10 +379,16 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     switch (e.code) {
       // Поворот направо
       case 'ArrowRight': {
-        this.room?.send('rotate', {
-          action: 'stop',
-          frame: this.engine.frame,
-        })
+        this.channel.emit(
+          GameEvents.ROTATE,
+          {
+            action: 'stop',
+            frame: this.engine.frame,
+          },
+          {
+            reliable: true,
+          }
+        )
 
         this.engine.game.me.isRotating = false
         break

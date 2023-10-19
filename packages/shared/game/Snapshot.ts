@@ -2,11 +2,13 @@ import { Engine, AliveState, Bullet } from '@astroparty/engine'
 import Matter from 'matter-js'
 import { degreesToRadian } from '../utils'
 import { Types } from '@geckos.io/snapshot-interpolation'
+import { ShipSprite } from '../types/ShipSprite'
 
 export type SnapshotPlayer = {
   id: string
   bullets: number
   angle: number
+  shipSprite: ShipSprite
   aliveState: AliveState
   positionX: number
   positionY: number
@@ -43,6 +45,7 @@ export const generateSnapshot = (engine: Engine): Snapshot => {
       bullets: player.bullets,
       aliveState: player.aliveState,
       angle: player.angle,
+      shipSprite: player.shipSprite,
       velocityX: player.body.velocity.x,
       velocityY: player.body.velocity.y,
     })
@@ -87,11 +90,6 @@ export const restorePlayersFromSnapshot = (
 
     if (!enginePlayer) {
       return
-    }
-
-    // Set player's alive state dirty if it has updated
-    if (enginePlayer.aliveState !== snapshotPlayer.aliveState) {
-      enginePlayer.hasSyncedAliveState = false
     }
 
     enginePlayer.aliveState = snapshotPlayer.aliveState

@@ -16,7 +16,6 @@ class Player extends PIXI.Container {
     super()
     this.sprite = new PIXI.Sprite(Assets.get(enginePlayer.shipSprite))
     this.enginePlayer = enginePlayer
-    this.scale.set(Player.ALIVE_SCALE)
     this.rotation = enginePlayer.body.angle
     this.sprite.anchor.set(0.5)
     this.sprite.position.set(
@@ -24,6 +23,7 @@ class Player extends PIXI.Container {
       Player.SPRITE_POSITION_CORRECTION.y
     )
     this.sprite.rotation = degreesToRadian(Player.SPRITE_ANGLE_CORRECTION)
+    this.processAliveState()
 
     this.addChild(this.sprite)
   }
@@ -32,27 +32,38 @@ class Player extends PIXI.Container {
     // noop
   }
 
+  processAliveState() {
+    switch (this.enginePlayer.aliveState) {
+      case AliveState.ALIVE: {
+        this.scale.set(Player.ALIVE_SCALE)
+        break
+      }
+      case AliveState.CRAFT_DESTROYED: {
+        this.scale.set(Player.CRAFT_DESTROYED_SCALE)
+        break
+      }
+      case AliveState.DEAD: {
+        // TODO: impl dead state
+        break
+      }
+    }
+  }
+
   update(interpolation: number) {
-    const angle = this.enginePlayer.body.angle
-    const nextAngle = this.rotation + (angle - this.rotation) * interpolation
-
-    // Не уверен, что на каждом тике применять scale это хорошая идея, но и проблем не заметил
-    if (this.enginePlayer.aliveState === AliveState.CRAFT_DESTROYED) {
-      this.scale.set(Player.CRAFT_DESTROYED_SCALE)
-    }
-
-    if (this.enginePlayer.aliveState === AliveState.ALIVE) {
-      this.scale.set(Player.ALIVE_SCALE)
-    }
+    const engineAngle = this.enginePlayer.body.angle
+    const nextAngle =
+      this.rotation + (engineAngle - this.rotation) * interpolation
 
     if (this.enginePlayer.isDashing) {
       this.rotation = lerp(this.rotation, nextAngle, 0.2)
-    } else if (Math.abs(angle - this.rotation) > degreesToRadian(90)) {
+    } else if (Math.abs(engineAngle - this.rotation) > degreesToRadian(90)) {
       // Update angle instantly if rotation is too big
-      this.rotation = angle
+      this.rotation = engineAngle
     } else {
       this.rotation = lerp(this.rotation, nextAngle, 0.3)
     }
+
+    this.processAliveState()
   }
 }
 
