@@ -15,6 +15,7 @@ export enum GameEvents {
 export interface InitEventMessage {
   playerId: Player['id']
   snapshot: Snapshot
+  frame: number
 }
 
 export type UpdateEventMessage = Snapshot

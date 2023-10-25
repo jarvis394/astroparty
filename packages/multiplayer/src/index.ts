@@ -5,12 +5,14 @@ import { Engine } from '@astroparty/engine'
 import { v4 } from 'uuid'
 import { GameEvents, RotateEventMessage, ShootEventMessage } from '@astroparty/shared/types/GameEvents'
 import { generateSnapshot } from '@astroparty/shared/game/Snapshot'
+import { addLatencyAndPackagesLoss } from './utils/addLatencyAndPackageLoss'
+import { PORT } from './config/constants'
 
 const io = geckos()
 const rooms: Map<string, GameRoom> = new Map()
 const avaliableRooms: Set<string> = new Set()
 
-io.listen(9208)
+io.listen(PORT)
 
 class GameRoom {
 	id: string
@@ -69,7 +71,7 @@ class GameRoom {
 		const snapshot = generateSnapshot(this.game.engine)
 		const snapshotPlayer = snapshot.state.players.find((e) => e.id === playerId)
 
-		channel.emit(GameEvents.INIT, { snapshot, playerId })
+		channel.emit(GameEvents.INIT, { snapshot, playerId, frame: this.game.engine.frame })
 
 		this.channels.forEach((broadcastChannel) => {
 			// Skip just joined player
@@ -86,25 +88,32 @@ class GameRoom {
 
 		this.channels.delete(channel.userData.playerId)
 		this.game.handlePlayerLeave(channel)
+		io.room(this.id).emit(GameEvents.PLAYER_LEFT, channel.userData.playerId)
 
 		console.log(`${channel.id} got disconnected`)
 	}
 
 	handlePlayerRotate(channel: ServerChannel, message: Data) {
-		const decodedMessage = this.decodeMessage<RotateEventMessage>(message)
-		decodedMessage && this.game.handleRotate(channel, decodedMessage)
+		addLatencyAndPackagesLoss(() => {
+			const decodedMessage = this.decodeMessage<RotateEventMessage>(message)
+			decodedMessage && this.game.handleRotate(channel, decodedMessage)
+		})
 	}
 
 	handlePlayerDash(channel: ServerChannel, message: Data) {
-		this.game.handleDash(channel)
+		addLatencyAndPackagesLoss(() => {
+			this.game.handleDash(channel)
+		})
 	}
 
 	handlePlayerShoot(channel: ServerChannel, message: Data) {
-		const decodedMessage = this.decodeMessage<ShootEventMessage>(message)
+		addLatencyAndPackagesLoss(() => {
+			const decodedMessage = this.decodeMessage<ShootEventMessage>(message)
 
-		if (decodedMessage === null) return
+			if (decodedMessage === null) return
 
-		this.game.handleShoot(channel, decodedMessage)
+			this.game.handleShoot(channel, decodedMessage)
+		})
 	}
 
 	canAddPlayer() {

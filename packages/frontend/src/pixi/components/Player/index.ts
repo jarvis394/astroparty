@@ -35,7 +35,7 @@ class PlayerContainer extends PIXI.Container {
       lerp(this.position.y, position.y, 0.4)
     )
 
-    this.player.update(interpolation)
+    this.player.update()
     this.bullets.update(interpolation)
   }
 }

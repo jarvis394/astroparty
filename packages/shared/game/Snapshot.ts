@@ -14,6 +14,8 @@ export type SnapshotPlayer = {
   positionY: number
   velocityX: number
   velocityY: number
+  isRotating: number
+  isDashing: number
 }
 
 export type SnapshotBullet = {
@@ -48,6 +50,8 @@ export const generateSnapshot = (engine: Engine): Snapshot => {
       shipSprite: player.shipSprite,
       velocityX: player.body.velocity.x,
       velocityY: player.body.velocity.y,
+      isRotating: Number(player.isRotating),
+      isDashing: Number(player.isDashing),
     })
   })
 
@@ -71,19 +75,28 @@ export const generateSnapshot = (engine: Engine): Snapshot => {
   }
 }
 
+type RestoreEngineOptions = {
+  includeNonServerControlled?: boolean
+}
 export const restoreEngineFromSnapshot = (
   engine: Engine,
-  snapshot: Snapshot
+  snapshot: Snapshot,
+  options: RestoreEngineOptions = {
+    includeNonServerControlled: false,
+  }
 ) => {
-  restorePlayersFromSnapshot(engine, snapshot.state.players)
-  restoreBulletsFromSnapshot(engine, snapshot.state.bullets)
+  restorePlayersFromSnapshot(engine, snapshot.state.players, options)
+  restoreBulletsFromSnapshot(engine, snapshot.state.bullets, options)
 
   engine.frame = Number(snapshot.id)
 }
 
 export const restorePlayersFromSnapshot = (
   engine: Engine,
-  players: Snapshot['state']['players']
+  players: Snapshot['state']['players'],
+  options: RestoreEngineOptions = {
+    includeNonServerControlled: false,
+  }
 ) => {
   players.forEach((snapshotPlayer) => {
     const enginePlayer = engine.game.world.getPlayerByID(snapshotPlayer.id)
@@ -100,7 +113,9 @@ export const restorePlayersFromSnapshot = (
     }
 
     // Do not update player by snapshot if it is not controlled by snapshots (by server)
-    if (!enginePlayer.isServerControlled) return
+    // Update if we override it in options
+    if (!options.includeNonServerControlled && !enginePlayer.isServerControlled)
+      return
 
     Matter.Body.setPosition(
       enginePlayer.body,
@@ -120,7 +135,10 @@ export const restorePlayersFromSnapshot = (
 
 export const restoreBulletsFromSnapshot = (
   engine: Engine,
-  bullets: Snapshot['state']['bullets']
+  bullets: Snapshot['state']['bullets'],
+  options: RestoreEngineOptions = {
+    includeNonServerControlled: false,
+  }
 ) => {
   bullets.forEach((snapshotBullet) => {
     let engineBullet = engine.game.world.getBulletByID(snapshotBullet.id)
@@ -149,7 +167,9 @@ export const restoreBulletsFromSnapshot = (
     }
 
     // Do not update bullet by snapshot if it is not controlled by snapshots (by server)
-    if (!engineBullet.isServerControlled) return
+    // Update if we override it in options
+    if (!options.includeNonServerControlled && !engineBullet.isServerControlled)
+      return
 
     Matter.Body.setPosition(
       engineBullet.body,

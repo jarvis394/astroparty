@@ -3,6 +3,7 @@ import {
   SnapshotBullet,
   SnapshotPlayer,
   restoreBulletsFromSnapshot,
+  restoreEngineFromSnapshot,
   restorePlayersFromSnapshot,
 } from '@astroparty/shared/game/Snapshot'
 import {
@@ -12,10 +13,14 @@ import {
   PlayerLeftEventMessage,
   ShootAckEventMessage,
 } from '@astroparty/shared/types/GameEvents'
-import map from '@astroparty/shared/utils/map'
+
 import { EventEmitter, Engine, Player } from '@astroparty/engine'
 import Matter from 'matter-js'
-import { MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED } from 'src/config/constants'
+import {
+  GECKOS_HOSTNAME,
+  GECKOS_PORT,
+  MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED,
+} from 'src/config/constants'
 import geckos, { ClientChannel } from '@geckos.io/client'
 import { SnapshotInterpolation, Vault } from '@geckos.io/snapshot-interpolation'
 
@@ -31,21 +36,43 @@ type ClientEngineEmitterEvents = {
   [ClientEngineEvents.PLAYER_LEFT]: (playerId: Player['id']) => void
 }
 
+enum ClientInputAction {
+  ROTATE_START,
+  ROTATE_END,
+  SHOOT,
+  DASH,
+}
+
+interface ClientInput {
+  action: ClientInputAction
+  time: number
+}
+
 export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   snapshots: SnapshotInterpolation
   clientSnapshotsVault: Vault
   engine: Engine
+  mePlayerEngine: Engine
   channel: ClientChannel
   playerId: string | null
   keysPressed: Set<string> = new Set()
+  clientInputHistory: ClientInput[]
+  /** Key is a timestamp in ms for frame */
+  frameDeltasMs: Map<number, number> = new Map()
   private isHoldingShootButton = false
+  private previousServerSnapshot: Snapshot | null = null
 
   constructor(engine: Engine, playerId: string | null) {
     super()
     this.snapshots = new SnapshotInterpolation(Engine.MIN_FPS)
     this.clientSnapshotsVault = new Vault()
+    this.clientInputHistory = []
     this.engine = engine
-    this.channel = geckos()
+    this.mePlayerEngine = new Engine()
+    this.channel = geckos({
+      url: GECKOS_HOSTNAME,
+      port: GECKOS_PORT,
+    })
     this.playerId = playerId
   }
 
@@ -55,8 +82,13 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         this.handleKeyDown(keyCode)
       })
 
+      this.mePlayerEngine.update(this.engine.lastDelta)
+
       const snapshot = this.generateSnapshotForClientEngine()
-      snapshot && this.clientSnapshotsVault.add(snapshot)
+      if (snapshot) {
+        this.clientSnapshotsVault.add(snapshot)
+        this.frameDeltasMs.set(snapshot.time, this.engine.lastDelta)
+      }
     })
 
     window.addEventListener('keydown', this.onKeyDown.bind(this))
@@ -99,37 +131,98 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     enginePlayer.bullets = message.playerBulletsAmount
   }
 
+  // reconcilePlayer(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
+  //   const player = this.engine.game.me
+
+  //   if (!player || player.isDashing) return
+
+  //   const serverPos = serverSnapshot.state.players.find(
+  //     (s) => s.id === this.playerId
+  //   )
+  //   const clientPos = playerSnapshot.state.players.find(
+  //     (s) => s.id === this.playerId
+  //   )
+
+  //   if (!clientPos || !serverPos) return
+
+  //   // Calculate the offset between server and client
+  //   const offsetX = clientPos?.positionX - serverPos?.positionX
+  //   const offsetY = clientPos?.positionY - serverPos?.positionY
+  //   const offsetAngle = clientPos?.angle - serverPos?.angle
+  //   const positionCorrectionCoeff = 30
+  //   const angleCorrectionCoeff = 30
+
+  //   // Apply a step by step correction of the player's position
+  //   Matter.Body.setPosition(
+  //     player.body,
+  //     Matter.Vector.create(
+  //       player.body.position.x - offsetX / positionCorrectionCoeff,
+  //       player.body.position.y - offsetY / positionCorrectionCoeff
+  //     )
+  //   )
+  //   player.angle -= offsetAngle / angleCorrectionCoeff
+  // }
+
   reconcilePlayer(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
-    const player = this.engine.game.me
-
-    if (!player || player.isDashing) return
-
-    const serverPos = serverSnapshot.state.players.find(
-      (s) => s.id === this.playerId
+    const presentTime = playerSnapshot.time
+    let currentTime = serverSnapshot.time
+    const me = this.mePlayerEngine.game.me
+    const mePreviousServer = this.previousServerSnapshot?.state.players.find(
+      (e) => e.id === this.playerId
     )
-    const clientPos = playerSnapshot.state.players.find(
-      (s) => s.id === this.playerId
+    const meCurrentServer = serverSnapshot?.state.players.find(
+      (e) => e.id === this.playerId
     )
 
-    if (!clientPos || !serverPos) return
+    // console.log(this.previousServerSnapshot, serverSnapshot)
+    if (!me || !mePreviousServer || !meCurrentServer) {
+      this.previousServerSnapshot = serverSnapshot
+      return
+    }
 
-    // Calculate the offset between server and client
-    const offsetX = clientPos?.positionX - serverPos?.positionX
-    const offsetY = clientPos?.positionY - serverPos?.positionY
-    const offsetAngle = clientPos?.angle - serverPos?.angle
-    const positionCorrectionCoeff =
-      200 - map(Math.max(Math.abs(offsetX), Math.abs(offsetY)), 0, 20, 20, 100)
-    const angleCorrectionCoeff = 10
+    // if (
+    //   (!mePreviousServer.isRotating && meCurrentServer.isRotating) ||
+    //   (!mePreviousServer.isDashing && meCurrentServer.isDashing)
+    // ) {
+    restoreEngineFromSnapshot(this.mePlayerEngine, serverSnapshot, {
+      includeNonServerControlled: true,
+    })
 
-    // Apply a step by step correction of the player's position
-    Matter.Body.setPosition(
-      player.body,
-      Matter.Vector.create(
-        player.body.position.x - offsetX / positionCorrectionCoeff,
-        player.body.position.y - offsetY / positionCorrectionCoeff
+    while (currentTime < presentTime) {
+      const currentDelta = Math.min(
+        this.frameDeltasMs.get(currentTime) || Engine.MIN_DELTA,
+        presentTime - currentTime
       )
-    )
-    player.angle -= offsetAngle / angleCorrectionCoeff
+      currentTime += currentDelta
+
+      this.clientInputHistory.forEach((input) => {
+        if (!this.mePlayerEngine.game.me) return
+        if (
+          input.time >= currentTime &&
+          input.time < currentTime + Engine.MIN_DELTA
+        ) {
+          switch (input.action) {
+            case ClientInputAction.ROTATE_START:
+              this.mePlayerEngine.game.me.isRotating = true
+              break
+            case ClientInputAction.ROTATE_END:
+              this.mePlayerEngine.game.me.isRotating = false
+              break
+            case ClientInputAction.DASH:
+              this.mePlayerEngine.game.me.dash()
+              break
+            case ClientInputAction.SHOOT:
+              this.mePlayerEngine.game.me.shoot()
+              break
+          }
+        }
+      })
+
+      this.mePlayerEngine.update(currentDelta)
+    }
+    // }
+
+    this.previousServerSnapshot = serverSnapshot
   }
 
   reconcileBullets(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
@@ -159,11 +252,10 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   serverReconciliation() {
     // Get latest snapshot from the server
     const serverSnapshot = this.snapshots.vault.get() as Snapshot | undefined
-    // Get closest player snapshot that matches server's snapshot time
-    const playerSnapshot = this.clientSnapshotsVault.get(
-      serverSnapshot?.time || Date.now(),
-      true
-    ) as Snapshot | undefined
+    // Get latest player snapshot
+    const playerSnapshot = this.clientSnapshotsVault.get() as
+      | Snapshot
+      | undefined
 
     if (serverSnapshot && playerSnapshot) {
       this.reconcilePlayer(serverSnapshot, playerSnapshot)
@@ -171,9 +263,34 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     }
   }
 
+  reconcilePlayerByMeEngine() {
+    const clientPlayer = this.engine.game.me
+    const serverPlayer = this.mePlayerEngine.game.me
+
+    if (!clientPlayer || !serverPlayer) return
+
+    const offsetX = clientPlayer.body.position.x - serverPlayer.body.position.x
+    const offsetY = clientPlayer.body.position.y - serverPlayer.body.position.y
+    const offsetAngle = clientPlayer.angle - serverPlayer.angle
+    const positionCorrectionCoeff = 60
+    const angleCorrectionCoeff = 60
+
+    // Apply a step by step correction of the player's position
+    Matter.Body.setPosition(
+      clientPlayer.body,
+      Matter.Vector.create(
+        clientPlayer.body.position.x - offsetX / positionCorrectionCoeff,
+        clientPlayer.body.position.y - offsetY / positionCorrectionCoeff
+      )
+    )
+    clientPlayer.angle -= offsetAngle / angleCorrectionCoeff
+  }
+
   frameSync() {
     this.serverReconciliation()
+    this.reconcilePlayerByMeEngine()
 
+    const snapshot = this.snapshots.vault.get()
     const playersSnapshot = this.snapshots.calcInterpolation(
       'positionX positionY angle(deg) velocityX velocityY',
       'players'
@@ -191,10 +308,14 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
     players && restorePlayersFromSnapshot(this.engine, players)
     bullets && restoreBulletsFromSnapshot(this.engine, bullets)
+
+    if (snapshot) {
+      this.engine.frame = Number(snapshot?.id)
+    }
   }
 
-  handleInitRoom({ snapshot, playerId }: InitEventMessage) {
-    this.engine.frame = 0
+  handleInitRoom({ snapshot, playerId, frame }: InitEventMessage) {
+    this.engine.frame = frame
 
     Object.values(snapshot.state.players).forEach((serverPlayer) => {
       const player = new Player({
@@ -215,8 +336,21 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         playerId === serverPlayer.id &&
         !MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED
       ) {
+        const me = new Player({
+          id: serverPlayer.id,
+          position: { x: serverPlayer.positionX, y: serverPlayer.positionY },
+          shipSprite: serverPlayer.shipSprite,
+          world: this.engine.game.world,
+        })
+        me.angle = serverPlayer.angle
+        me.aliveState = serverPlayer.aliveState
+        me.bullets = serverPlayer.bullets
+        me.body.isSensor = true
+
         this.playerId = playerId
         this.engine.game.setMe(player)
+        this.mePlayerEngine.addPlayer(me)
+        this.mePlayerEngine.game.setMe(me)
         player.setServerControlled(false)
       } else {
         player.setServerControlled(true)
@@ -268,6 +402,8 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   }
 
   handlePlayerLeft(playerId: string) {
+    console.log('player left:', playerId)
+
     this.engine.removePlayer(playerId)
     this.eventEmitter.emit(ClientEngineEvents.PLAYER_LEFT, playerId)
   }
@@ -287,6 +423,8 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       positionY: me.body.position.y,
       velocityX: me.body.velocity.x,
       velocityY: me.body.velocity.y,
+      isRotating: Number(me.isRotating),
+      isDashing: Number(me.isDashing),
     }
     const bullets: SnapshotBullet[] = []
 
@@ -302,7 +440,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
     return {
       id: this.engine.frame.toString(),
-      time: Date.now(),
+      time: this.engine.frameTimestamp,
       state: {
         players: [player],
         bullets,
@@ -314,54 +452,113 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     this.snapshots.vault.add(snapshot)
   }
 
-  handleKeyDown(keyCode: string) {
-    if (!this.engine.game.me) return
+  handleRotateStart() {
+    if (
+      !this.engine.game.me ||
+      !this.mePlayerEngine.game.me ||
+      this.engine.game.me?.isRotating
+    ) {
+      return
+    }
 
+    this.channel.emit(
+      GameEvents.ROTATE,
+      {
+        action: 'start',
+        frame: this.engine.frame,
+      },
+      {
+        reliable: true,
+      }
+    )
+
+    this.clientInputHistory.push({
+      action: ClientInputAction.ROTATE_START,
+      time: Date.now(),
+    })
+
+    this.engine.game.me.isRotating = true
+    this.mePlayerEngine.game.me.isRotating = true
+  }
+
+  handleDash() {
+    if (!this.engine.game.me || !this.mePlayerEngine.game.me) return
+    if (
+      !MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED &&
+      this.engine.game.me.isDashing
+    ) {
+      return
+    }
+
+    this.channel?.emit(GameEvents.DASH, null, {
+      reliable: true,
+    })
+
+    this.clientInputHistory.push({
+      action: ClientInputAction.DASH,
+      time: Date.now(),
+    })
+
+    if (!MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
+      this.engine.game.me.dash()
+      this.mePlayerEngine.game.me.dash()
+    }
+  }
+
+  handleShoot() {
+    if (!this.engine.game.me || this.isHoldingShootButton) return
+
+    const bullet = this.engine.game.me.shoot()
+    this.channel?.emit(GameEvents.SHOOT, bullet ? bullet.id : undefined, {
+      reliable: true,
+    })
+
+    this.clientInputHistory.push({
+      action: ClientInputAction.SHOOT,
+      time: Date.now(),
+    })
+
+    this.isHoldingShootButton = true
+  }
+
+  handleRotateStop() {
+    if (!this.engine.game.me || !this.mePlayerEngine.game.me) return
+
+    this.channel.emit(
+      GameEvents.ROTATE,
+      {
+        action: 'stop',
+        frame: this.engine.frame,
+      },
+      {
+        reliable: true,
+      }
+    )
+
+    this.clientInputHistory.push({
+      action: ClientInputAction.ROTATE_END,
+      time: Date.now(),
+    })
+
+    this.engine.game.me.isRotating = false
+    this.mePlayerEngine.game.me.isRotating = false
+  }
+
+  handleKeyDown(keyCode: string) {
     switch (keyCode) {
       // Поворот направо
       case 'ArrowRight': {
-        if (this.engine.game.me?.isRotating) return
-
-        this.channel.emit(
-          GameEvents.ROTATE,
-          {
-            action: 'start',
-            frame: this.engine.frame,
-          },
-          {
-            reliable: true,
-          }
-        )
-
-        this.engine.game.me.isRotating = true
+        this.handleRotateStart()
         break
       }
       // Прыжок
       case 'KeyW': {
-        if (
-          !MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED &&
-          this.engine.game.me.isDashing
-        ) {
-          return
-        }
-
-        this.channel?.emit(GameEvents.DASH, null, {
-          reliable: true,
-        })
-
-        if (!MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
-          this.engine.game.me.dash()
-        }
+        this.handleDash()
         break
       }
       // Выстрел
       case 'Space': {
-        if (this.isHoldingShootButton) return
-        const bullet = this.engine.game.me.shoot()
-        this.channel?.emit(GameEvents.SHOOT, bullet ? bullet.id : undefined, {
-          reliable: true,
-        })
-        this.isHoldingShootButton = true
+        this.handleShoot()
         break
       }
     }
@@ -374,23 +571,10 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   onKeyUp(e: KeyboardEvent) {
     this.keysPressed.delete(e.code)
 
-    if (!this.engine.game.me) return
-
     switch (e.code) {
       // Поворот направо
       case 'ArrowRight': {
-        this.channel.emit(
-          GameEvents.ROTATE,
-          {
-            action: 'stop',
-            frame: this.engine.frame,
-          },
-          {
-            reliable: true,
-          }
-        )
-
-        this.engine.game.me.isRotating = false
+        this.handleRotateStop()
         break
       }
       // Выстрел

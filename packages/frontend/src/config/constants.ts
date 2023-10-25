@@ -1,4 +1,5 @@
-export const WS_HOSTNAME = import.meta.env.VITE_WS_HOSTNAME
+export const GECKOS_HOSTNAME = import.meta.env.VITE_GECKOS_HOSTNAME
+export const GECKOS_PORT = import.meta.env.VITE_GECKOS_PORT
 export const MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED =
   import.meta.env.VITE_MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED ===
   'true'

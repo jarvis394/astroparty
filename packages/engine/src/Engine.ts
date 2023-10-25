@@ -10,15 +10,21 @@ class Engine {
   game: Game
   matterEngine: Matter.Engine
   frame: number
+  frameTimestamp: number
+  lastDelta: number
 
   constructor() {
     this.matterEngine = Matter.Engine.create({
       gravity: Matter.Vector.create(0, 0),
+      constraintIterations: 6,
+      positionIterations: 16,
     })
     this.game = new Game({
       matterEngine: this.matterEngine,
     })
     this.frame = 0
+    this.frameTimestamp = this.getFrameTimestamp()
+    this.lastDelta = 0
   }
 
   public addPlayer(player: Player): Player {
@@ -35,10 +41,16 @@ class Engine {
     return player
   }
 
+  public getFrameTimestamp() {
+    return Date.now()
+  }
+
   public update(delta: number) {
     Matter.Engine.update(this.matterEngine, delta)
     this.game.update()
     this.frame += 1
+    this.frameTimestamp = this.getFrameTimestamp()
+    this.lastDelta = delta
   }
 
   public start() {

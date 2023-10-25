@@ -49,18 +49,16 @@ class Player extends PIXI.Container {
     }
   }
 
-  update(interpolation: number) {
+  update() {
     const engineAngle = this.enginePlayer.body.angle
-    const nextAngle =
-      this.rotation + (engineAngle - this.rotation) * interpolation
 
     if (this.enginePlayer.isDashing) {
-      this.rotation = lerp(this.rotation, nextAngle, 0.2)
+      this.rotation = lerp(this.rotation, engineAngle, 0.2)
     } else if (Math.abs(engineAngle - this.rotation) > degreesToRadian(90)) {
       // Update angle instantly if rotation is too big
       this.rotation = engineAngle
     } else {
-      this.rotation = lerp(this.rotation, nextAngle, 0.3)
+      this.rotation = lerp(this.rotation, engineAngle, 0.3)
     }
 
     this.processAliveState()
