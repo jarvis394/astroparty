@@ -21,6 +21,7 @@ type WorldEmitterEvents = {
 class World extends EventEmitter<WorldEmitterEvents> {
   public static WORLD_HEIGHT = 1024
   public static WORLD_WIDTH = 1024
+  public static WALL_COLLISION_CATEGORY = 0x0001
   private static WALL_HEIGHT = 50
   private static WALL_PREFIX = 'wall'
 
@@ -168,6 +169,9 @@ class World extends EventEmitter<WorldEmitterEvents> {
       restitution: 0,
       mass: 0,
       label: World.WALL_PREFIX,
+      collisionFilter: {
+        category: World.WALL_COLLISION_CATEGORY,
+      },
     }
 
     const bodies = [

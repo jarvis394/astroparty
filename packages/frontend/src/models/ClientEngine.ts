@@ -14,7 +14,7 @@ import {
   ShootAckEventMessage,
 } from '@astroparty/shared/types/GameEvents'
 
-import { EventEmitter, Engine, Player } from '@astroparty/engine'
+import { EventEmitter, Engine, Player, World } from '@astroparty/engine'
 import Matter from 'matter-js'
 import {
   GECKOS_HOSTNAME,
@@ -82,8 +82,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         this.handleKeyDown(keyCode)
       })
 
-      this.mePlayerEngine.update(this.engine.lastDelta)
-
       const snapshot = this.generateSnapshotForClientEngine()
       if (snapshot) {
         this.clientSnapshotsVault.add(snapshot)
@@ -131,59 +129,25 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     enginePlayer.bullets = message.playerBulletsAmount
   }
 
-  // reconcilePlayer(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
-  //   const player = this.engine.game.me
-
-  //   if (!player || player.isDashing) return
-
-  //   const serverPos = serverSnapshot.state.players.find(
-  //     (s) => s.id === this.playerId
-  //   )
-  //   const clientPos = playerSnapshot.state.players.find(
-  //     (s) => s.id === this.playerId
-  //   )
-
-  //   if (!clientPos || !serverPos) return
-
-  //   // Calculate the offset between server and client
-  //   const offsetX = clientPos?.positionX - serverPos?.positionX
-  //   const offsetY = clientPos?.positionY - serverPos?.positionY
-  //   const offsetAngle = clientPos?.angle - serverPos?.angle
-  //   const positionCorrectionCoeff = 30
-  //   const angleCorrectionCoeff = 30
-
-  //   // Apply a step by step correction of the player's position
-  //   Matter.Body.setPosition(
-  //     player.body,
-  //     Matter.Vector.create(
-  //       player.body.position.x - offsetX / positionCorrectionCoeff,
-  //       player.body.position.y - offsetY / positionCorrectionCoeff
-  //     )
-  //   )
-  //   player.angle -= offsetAngle / angleCorrectionCoeff
-  // }
-
   reconcilePlayer(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
-    const presentTime = playerSnapshot.time
-    let currentTime = serverSnapshot.time
-    const me = this.mePlayerEngine.game.me
-    const mePreviousServer = this.previousServerSnapshot?.state.players.find(
+    const presentTime = serverSnapshot.time
+    let currentTime = this.previousServerSnapshot?.time || playerSnapshot.time
+    // Local player from local engine
+    const meLocal = this.mePlayerEngine.game.me
+    // Server player from previous from latest snapshot
+    const mePrevious = this.previousServerSnapshot?.state.players.find(
       (e) => e.id === this.playerId
     )
-    const meCurrentServer = serverSnapshot?.state.players.find(
+    // Server player from latest snapshot
+    const meCurrent = serverSnapshot?.state.players.find(
       (e) => e.id === this.playerId
     )
 
-    // console.log(this.previousServerSnapshot, serverSnapshot)
-    if (!me || !mePreviousServer || !meCurrentServer) {
+    if (!meLocal || !mePrevious || !meCurrent) {
       this.previousServerSnapshot = serverSnapshot
       return
     }
 
-    // if (
-    //   (!mePreviousServer.isRotating && meCurrentServer.isRotating) ||
-    //   (!mePreviousServer.isDashing && meCurrentServer.isDashing)
-    // ) {
     restoreEngineFromSnapshot(this.mePlayerEngine, serverSnapshot, {
       includeNonServerControlled: true,
     })
@@ -220,7 +184,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
       this.mePlayerEngine.update(currentDelta)
     }
-    // }
 
     this.previousServerSnapshot = serverSnapshot
   }
@@ -287,7 +250,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   }
 
   frameSync() {
-    this.serverReconciliation()
     this.reconcilePlayerByMeEngine()
 
     const snapshot = this.snapshots.vault.get()
@@ -345,7 +307,10 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         me.angle = serverPlayer.angle
         me.aliveState = serverPlayer.aliveState
         me.bullets = serverPlayer.bullets
-        me.body.isSensor = true
+        me.body.collisionFilter = {
+          mask: World.WALL_COLLISION_CATEGORY,
+          category: Player.PLAYER_COLLISION_CATEGORY,
+        }
 
         this.playerId = playerId
         this.engine.game.setMe(player)
@@ -450,6 +415,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
   handleRoomStateChange(snapshot: Snapshot) {
     this.snapshots.vault.add(snapshot)
+    this.serverReconciliation()
   }
 
   handleRotateStart() {
@@ -478,7 +444,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     })
 
     this.engine.game.me.isRotating = true
-    this.mePlayerEngine.game.me.isRotating = true
+    // this.mePlayerEngine.game.me.isRotating = true
   }
 
   handleDash() {
@@ -501,7 +467,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
     if (!MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
       this.engine.game.me.dash()
-      this.mePlayerEngine.game.me.dash()
+      // this.mePlayerEngine.game.me.dash()
     }
   }
 
@@ -541,7 +507,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     })
 
     this.engine.game.me.isRotating = false
-    this.mePlayerEngine.game.me.isRotating = false
+    // this.mePlayerEngine.game.me.isRotating = false
   }
 
   handleKeyDown(keyCode: string) {

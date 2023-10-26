@@ -39,6 +39,7 @@ class Player {
   public static DASH_BODY_FRICTION_AIR = 0.2
   public static BULLET_KNOCKBACK_FORCE = Player.VELOCITY_FORCE * 6
   public static BULLET_REPLENISH_TIMEOUT = 2000
+  public static PLAYER_COLLISION_CATEGORY = 0x0010
 
   id: string
   world: World
@@ -268,6 +269,9 @@ class Player {
       frictionAir: Player.BODY_FRICTION_AIR,
       angularVelocity: 0,
       restitution: 0,
+      collisionFilter: {
+        category: Player.PLAYER_COLLISION_CATEGORY,
+      },
     })
   }
 }
