@@ -10,6 +10,9 @@ export enum GameEvents {
   SHOOT_ACK = '5',
   PLAYER_JOIN = '6',
   PLAYER_LEFT = '7',
+  DASH_ACK = '8',
+  ROTATE_START_ACK = '9',
+  ROTATE_END_ACK = '10',
 }
 
 export interface InitEventMessage {

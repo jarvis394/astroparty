@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'
 
-const envFile = process.env.NODE_ENV ? `.env.${process.env.NODE_END}` : '.env'
+const envFile = process.env.NODE_ENV ? `.env.${process.env.NODE_ENV}` : '.env'
 dotenv.config({ path: envFile })
 
 export const PORT = process.env.PORT ? Number(process.env.PORT) : 9028

@@ -1,12 +1,13 @@
 import geckos, { Data, ServerChannel } from '@geckos.io/server'
 import ClockTimer from '@gamestdio/timer'
 import GameController from './controllers/GameController'
-import { Engine } from '@astroparty/engine'
+import { Engine, EventEmitter } from '@astroparty/engine'
 import { v4 } from 'uuid'
 import { GameEvents, RotateEventMessage, ShootEventMessage } from '@astroparty/shared/types/GameEvents'
 import { generateSnapshot } from '@astroparty/shared/game/Snapshot'
 import { addLatencyAndPackagesLoss } from './utils/addLatencyAndPackageLoss'
 import { PORT } from './config/constants'
+import { SIMULATE_LATENCY, LATENCY_RANGE_START, LATENCY_RANGE_END } from 'src/config/constants'
 
 const io = geckos()
 const rooms: Map<string, GameRoom> = new Map()
@@ -14,7 +15,18 @@ const avaliableRooms: Set<string> = new Set()
 
 io.listen(PORT)
 
-class GameRoom {
+if (SIMULATE_LATENCY) {
+	console.log(`Simulating latency: from ${LATENCY_RANGE_START} to ${LATENCY_RANGE_END}`)
+}
+
+enum GameRoomEvents {
+	DISPOSE = 'dispose',
+}
+type GameRoomEmitterEvents = {
+	[GameRoomEvents.DISPOSE]: (roomId: string) => void
+}
+
+class GameRoom extends EventEmitter<GameRoomEmitterEvents> {
 	id: string
 	maxPlayers = 4
 	channels: Map<string, ServerChannel>
@@ -23,6 +35,8 @@ class GameRoom {
 	private simulationInterval?: NodeJS.Timer
 
 	constructor() {
+		super()
+
 		this.id = v4()
 		this.channels = new Map()
 		this.game = new GameController()
@@ -40,13 +54,16 @@ class GameRoom {
 
 		const snapshot = this.game.update(this.clock.deltaTime)
 
-		io.room(this.id).emit(GameEvents.UPDATE, snapshot)
+		addLatencyAndPackagesLoss(() => {
+			io.room(this.id).emit(GameEvents.UPDATE, snapshot)
+		})
 	}
 
 	destroy() {
 		this.game.handleRoomDispose()
 		this.clock.stop()
 		clearInterval(this.simulationInterval)
+		this.eventEmitter.emit(GameRoomEvents.DISPOSE, this.id)
 	}
 
 	addPlayer(channel: ServerChannel) {
@@ -91,6 +108,10 @@ class GameRoom {
 		io.room(this.id).emit(GameEvents.PLAYER_LEFT, channel.userData.playerId)
 
 		console.log(`${channel.id} got disconnected`)
+
+		if (this.channels.size === 0) {
+			this.destroy()
+		}
 	}
 
 	handlePlayerRotate(channel: ServerChannel, message: Data) {
@@ -127,9 +148,10 @@ class GameRoom {
 
 io.onConnection((channel) => {
 	let hasAddedPlayerToRoom = false
+	let room: GameRoom | undefined
 
 	for (const roomId of avaliableRooms.values()) {
-		const room = rooms.get(roomId)
+		room = rooms.get(roomId)
 
 		if (!room) {
 			throw new Error('Should never happen: `roomId` from avaliableRooms does not exist in rooms')
@@ -146,10 +168,14 @@ io.onConnection((channel) => {
 	}
 
 	if (!hasAddedPlayerToRoom) {
-		const room = new GameRoom()
+		room = new GameRoom()
 		rooms.set(room.id, room)
 		avaliableRooms.add(room.id)
 		room.init()
 		room.addPlayer(channel)
 	}
+
+	room?.addEventListener('dispose', (roomId) => {
+		avaliableRooms.delete(roomId)
+	})
 })

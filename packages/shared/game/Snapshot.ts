@@ -89,6 +89,7 @@ export const restoreEngineFromSnapshot = (
   restoreBulletsFromSnapshot(engine, snapshot.state.bullets, options)
 
   engine.frame = Number(snapshot.id)
+  engine.frameTimestamp = snapshot.time
 }
 
 export const restorePlayersFromSnapshot = (

@@ -90,9 +90,11 @@ class GameController {
 		switch (message.action) {
 			case 'start':
 				player.isRotating = true
+				channel.emit(GameEvents.ROTATE_START_ACK)
 				break
 			case 'stop':
 				player.isRotating = false
+				channel.emit(GameEvents.ROTATE_END_ACK)
 				break
 			default:
 				return console.error(`rotate message from ${playerId} is incorrect, got "${message}"`)
@@ -108,6 +110,8 @@ class GameController {
 		}
 
 		player.dash()
+
+		channel.emit(GameEvents.DASH_ACK)
 	}
 
 	handleShoot(channel: ServerChannel, localBulletId: ShootEventMessage): Bullet | false {
@@ -126,12 +130,18 @@ class GameController {
 		}
 
 		if (!localBulletId) {
-			channel.emit(GameEvents.SHOOT_ACK, {
-				localBulletId,
-				serverBulletId: bullet.id,
-				playerId: player.id,
-				playerBulletsAmount: player.bullets,
-			})
+			channel.emit(
+				GameEvents.SHOOT_ACK,
+				{
+					localBulletId,
+					serverBulletId: bullet.id,
+					playerId: player.id,
+					playerBulletsAmount: player.bullets,
+				},
+				{
+					reliable: true,
+				}
+			)
 		}
 
 		return bullet

@@ -194,7 +194,7 @@ class MainScene extends PIXIObject {
   }
 
   update(interpolation: number) {
-    this.clientEngine.frameSync()
+    this.clientEngine.frameSync(interpolation)
 
     this.players.forEach((player) => {
       player.update(interpolation)

@@ -37,6 +37,7 @@ class World extends EventEmitter<WorldEmitterEvents> {
     super()
     this.instance = matterEngine.world
     this.walls = this.addWorldWalls()
+    this.addObstacles()
 
     Matter.Events.on(matterEngine, 'collisionStart', (event) => {
       for (const { bodyA, bodyB } of event.pairs) {
@@ -205,6 +206,33 @@ class World extends EventEmitter<WorldEmitterEvents> {
         World.WORLD_HEIGHT / 2,
         World.WALL_HEIGHT,
         World.WORLD_HEIGHT + World.WALL_HEIGHT * 2,
+        wallOptions
+      ),
+    ]
+
+    Matter.World.add(this.instance, bodies)
+
+    return bodies
+  }
+
+  private addObstacles(): Matter.Body[] {
+    const wallOptions: Matter.IChamferableBodyDefinition = {
+      isStatic: true,
+      friction: 0,
+      restitution: 0,
+      mass: 0,
+      label: World.WALL_PREFIX,
+      collisionFilter: {
+        category: World.WALL_COLLISION_CATEGORY,
+      },
+    }
+
+    const bodies = [
+      Matter.Bodies.rectangle(
+        World.WORLD_WIDTH / 2,
+        World.WORLD_HEIGHT / 2,
+        World.WALL_HEIGHT * 2,
+        World.WALL_HEIGHT * 2,
         wallOptions
       ),
     ]

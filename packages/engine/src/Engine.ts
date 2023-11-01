@@ -18,6 +18,7 @@ class Engine {
       gravity: Matter.Vector.create(0, 0),
       constraintIterations: 6,
       positionIterations: 16,
+      world: Matter.World.create({}),
     })
     this.game = new Game({
       matterEngine: this.matterEngine,
