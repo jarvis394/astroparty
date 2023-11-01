@@ -13,4 +13,4 @@ check_run() {
 
 check_run package.json "yarn && yarn lerna bootstrap"
 check_run packages/shared "yarn shared:build"
-check_run packages/engine "yarn shared:build"
+check_run packages/engine "yarn engine:build"

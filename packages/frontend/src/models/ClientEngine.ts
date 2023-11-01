@@ -162,12 +162,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
               break
             case ClientInputAction.DASH:
               this.mePlayerEngine.game.me.dash()
-              console.log('dashed', input, serverSnapshot, playerSnapshot)
-              console.log(
-                'dashing on frame',
-                this.mePlayerEngine.frame,
-                this.mePlayerEngine.frameTimestamp
-              )
               break
             case ClientInputAction.SHOOT:
               this.mePlayerEngine.game.me.shoot()
