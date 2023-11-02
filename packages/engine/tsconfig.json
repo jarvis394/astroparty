@@ -9,7 +9,7 @@
     "sourceMap": true,
     "target": "ES2021",
     "module": "ESNext",
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM"],
     "moduleResolution": "Node",
     "rootDir": "./src",
     "paths": {

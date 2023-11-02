@@ -5,6 +5,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
+    "@astroparty/engine": "^1.0.0",
     "@prisma/client": "^5.0.0",
     "prisma": "^5.0.0"
   },

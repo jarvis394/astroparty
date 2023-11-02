@@ -31,11 +31,11 @@ class PlayerContainer extends PIXI.Container {
     const position = this.enginePlayer.body.position
 
     this.position.set(
-      lerp(this.position.x, position.x, 0.4),
-      lerp(this.position.y, position.y, 0.4)
+      lerp(this.position.x, position.x, 0.2),
+      lerp(this.position.y, position.y, 0.2)
     )
 
-    this.player.update(interpolation)
+    this.player.update()
     this.bullets.update(interpolation)
   }
 }

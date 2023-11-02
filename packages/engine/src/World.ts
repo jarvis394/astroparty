@@ -21,6 +21,7 @@ type WorldEmitterEvents = {
 class World extends EventEmitter<WorldEmitterEvents> {
   public static WORLD_HEIGHT = 1024
   public static WORLD_WIDTH = 1024
+  public static WALL_COLLISION_CATEGORY = 0x0001
   private static WALL_HEIGHT = 50
   private static WALL_PREFIX = 'wall'
 
@@ -36,6 +37,7 @@ class World extends EventEmitter<WorldEmitterEvents> {
     super()
     this.instance = matterEngine.world
     this.walls = this.addWorldWalls()
+    this.addObstacles()
 
     Matter.Events.on(matterEngine, 'collisionStart', (event) => {
       for (const { bodyA, bodyB } of event.pairs) {
@@ -57,7 +59,7 @@ class World extends EventEmitter<WorldEmitterEvents> {
           Matter.World.remove(this.instance, a)
           this.eventEmitter.emit(WorldEvents.BULLET_DESPAWN, bulletId)
           if (player.aliveState === AliveState.ALIVE) {
-            player.makeCraftDestroyed()
+            player.aliveState = AliveState.CRAFT_DESTROYED
           }
           return this.bullets.delete(bulletId)
         }
@@ -168,6 +170,9 @@ class World extends EventEmitter<WorldEmitterEvents> {
       restitution: 0,
       mass: 0,
       label: World.WALL_PREFIX,
+      collisionFilter: {
+        category: World.WALL_COLLISION_CATEGORY,
+      },
     }
 
     const bodies = [
@@ -201,6 +206,33 @@ class World extends EventEmitter<WorldEmitterEvents> {
         World.WORLD_HEIGHT / 2,
         World.WALL_HEIGHT,
         World.WORLD_HEIGHT + World.WALL_HEIGHT * 2,
+        wallOptions
+      ),
+    ]
+
+    Matter.World.add(this.instance, bodies)
+
+    return bodies
+  }
+
+  private addObstacles(): Matter.Body[] {
+    const wallOptions: Matter.IChamferableBodyDefinition = {
+      isStatic: true,
+      friction: 0,
+      restitution: 0,
+      mass: 0,
+      label: World.WALL_PREFIX,
+      collisionFilter: {
+        category: World.WALL_COLLISION_CATEGORY,
+      },
+    }
+
+    const bodies = [
+      Matter.Bodies.rectangle(
+        World.WORLD_WIDTH / 2,
+        World.WORLD_HEIGHT / 2,
+        World.WALL_HEIGHT * 2,
+        World.WALL_HEIGHT * 2,
         wallOptions
       ),
     ]

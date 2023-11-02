@@ -1,9 +1,10 @@
 import World from './World'
 import Matter from 'matter-js'
-import { degreesToRadian, exhaustivnessCheck } from '@astroparty/shared/utils'
+import { degreesToRadian } from '@astroparty/shared/utils'
 import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
 import Bullet from './Bullet'
 import getAngleVector from './utils/getAngleVector'
+import Engine from './Engine'
 
 export enum AliveState {
   ALIVE,
@@ -39,6 +40,7 @@ class Player {
   public static DASH_BODY_FRICTION_AIR = 0.2
   public static BULLET_KNOCKBACK_FORCE = Player.VELOCITY_FORCE * 6
   public static BULLET_REPLENISH_TIMEOUT = 2000
+  public static PLAYER_COLLISION_CATEGORY = 0x0010
 
   id: string
   world: World
@@ -58,12 +60,6 @@ class Player {
    */
   isOpponent: boolean
   isMe: boolean
-  aliveState: AliveState
-  /**
-   * Флаг для синхронизации состояния корабля. Если стоит `false`, то игрок
-   * может быть по `Player.aliveState` мертв, а на самом деле движок считает иначе
-   */
-  hasSyncedAliveState: boolean
   /**
    * Флаг для управления игроком (движения вперёд), когда корабль уничтожен (`AliveState.CRAFT_DESTROYED`)
    */
@@ -71,6 +67,7 @@ class Player {
   /** Флаг для состояния, когда игрок обновляется по данным с сервера */
   isServerControlled: boolean
   shipSprite: ShipSprite
+  private _aliveState: AliveState
 
   constructor({ id, position, shipSprite, world }: PlayerConstructorProps) {
     this.id = id
@@ -82,12 +79,11 @@ class Player {
     this.angle = 0
     this.lastDashedMs = -1
     this.bullets = Player.BULLETS_AMOUNT
-    this.aliveState = AliveState.ALIVE
+    this._aliveState = AliveState.ALIVE
     this.isOpponent = true
     this.isMe = false
     this.isBoosting = false
     this.isServerControlled = false
-    this.hasSyncedAliveState = true
     this.shipSprite = shipSprite
 
     Matter.World.addBody(this.world.instance, this.body)
@@ -96,7 +92,7 @@ class Player {
   public dash(): boolean {
     if (this.aliveState !== AliveState.ALIVE) return false
 
-    const now = Date.now()
+    const now = Engine.now()
 
     if (this.lastDashedMs + Player.DASH_TIMEOUT_MS <= now) {
       this.lastDashedMs = now
@@ -151,30 +147,38 @@ class Player {
     return bullet
   }
 
-  public makeCraftDestroyed() {
-    if (
-      this.aliveState === AliveState.CRAFT_DESTROYED ||
-      this.aliveState === AliveState.DEAD
-    ) {
-      return
+  public set aliveState(value: AliveState) {
+    switch (value) {
+      case AliveState.ALIVE: {
+        if (this.aliveState === AliveState.ALIVE) {
+          break
+        }
+
+        this.makeAlive()
+        break
+      }
+      case AliveState.CRAFT_DESTROYED: {
+        if (
+          this.aliveState === AliveState.CRAFT_DESTROYED ||
+          this.aliveState === AliveState.DEAD
+        ) {
+          break
+        }
+
+        this.makeCraftDestroyed()
+        break
+      }
+      case AliveState.DEAD: {
+        this.makeDead()
+        break
+      }
     }
 
-    this.aliveState = AliveState.CRAFT_DESTROYED
-    this.hasSyncedAliveState = false
+    this._aliveState = value
   }
 
-  public makeAlive() {
-    if (this.aliveState === AliveState.ALIVE) {
-      return
-    }
-
-    this.aliveState = AliveState.ALIVE
-    this.hasSyncedAliveState = false
-  }
-
-  public makeDead() {
-    this.aliveState = AliveState.DEAD
-    this.hasSyncedAliveState = false
+  public get aliveState() {
+    return this._aliveState
   }
 
   public setServerControlled(state: boolean) {
@@ -182,8 +186,6 @@ class Player {
   }
 
   public update() {
-    this.processAliveState()
-
     if (this.isServerControlled) return
 
     this.processRotate()
@@ -203,41 +205,6 @@ class Player {
         Matter.Vector.mult(getAngleVector(this.body), Player.VELOCITY_FORCE)
       )
     }
-  }
-
-  public processAliveState() {
-    if (this.hasSyncedAliveState) return
-
-    switch (this.aliveState) {
-      case AliveState.ALIVE: {
-        const scale =
-          Player.HITBOX_RADIUS / Player.CRAFT_DESTROYED_HITBOX_RADIUS
-        Matter.Body.scale(this.body, scale, scale)
-        Matter.Body.set(this.body, {
-          restitution: Player.BODY_RESTITUTION,
-        })
-        this.aliveState = AliveState.ALIVE
-        break
-      }
-      case AliveState.CRAFT_DESTROYED: {
-        const scale =
-          Player.CRAFT_DESTROYED_HITBOX_RADIUS / Player.HITBOX_RADIUS
-        Matter.Body.scale(this.body, scale, scale)
-        Matter.Body.set(this.body, {
-          restitution: Player.CRAFT_DESTROYED_BODY_RESTITUTION,
-        })
-        this.aliveState = AliveState.CRAFT_DESTROYED
-        break
-      }
-      case AliveState.DEAD: {
-        // TODO: impl
-        break
-      }
-      default:
-        exhaustivnessCheck(this.aliveState)
-    }
-
-    this.hasSyncedAliveState = true
   }
 
   public processRotate() {
@@ -265,6 +232,26 @@ class Player {
     }
   }
 
+  private makeCraftDestroyed() {
+    const scale = Player.CRAFT_DESTROYED_HITBOX_RADIUS / Player.HITBOX_RADIUS
+    Matter.Body.scale(this.body, scale, scale)
+    Matter.Body.set(this.body, {
+      restitution: Player.CRAFT_DESTROYED_BODY_RESTITUTION,
+    })
+  }
+
+  private makeAlive() {
+    const scale = Player.HITBOX_RADIUS / Player.CRAFT_DESTROYED_HITBOX_RADIUS
+    Matter.Body.scale(this.body, scale, scale)
+    Matter.Body.set(this.body, {
+      restitution: Player.BODY_RESTITUTION,
+    })
+  }
+
+  private makeDead() {
+    // TODO: impl dead state
+  }
+
   public static getLabelFromId(id: string) {
     return Player.LABEL_PREFIX + id
   }
@@ -283,6 +270,9 @@ class Player {
       frictionAir: Player.BODY_FRICTION_AIR,
       angularVelocity: 0,
       restitution: 0,
+      collisionFilter: {
+        category: Player.PLAYER_COLLISION_CATEGORY,
+      },
     })
   }
 }

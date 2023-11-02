@@ -8,7 +8,6 @@ class ServerPlayer extends Player {
 	}
 
 	update(): void {
-		this.processAliveState()
 		this.processRotate()
 		this.processDash()
 		this.forward()

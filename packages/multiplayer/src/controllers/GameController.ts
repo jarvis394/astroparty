@@ -1,8 +1,9 @@
 import { Bullet } from '@astroparty/engine'
-import { GameRoomState } from '@astroparty/shared/colyseus/GameSchema'
-import { Snapshot, generateSnapshot } from '@astroparty/shared/colyseus/Snapshot'
+import { Snapshot, generateSnapshot } from '@astroparty/shared/game/Snapshot'
+import { GameEvents, ShootEventMessage } from '@astroparty/shared/types/GameEvents'
+import { GameState } from '@astroparty/shared/types/GameState'
+import { ServerChannel } from '@geckos.io/server'
 import { SnapshotInterpolation } from '@geckos.io/snapshot-interpolation'
-import { Client } from 'colyseus'
 import Matter from 'matter-js'
 import { ServerEngine, ServerPlayer } from 'src/engine'
 
@@ -30,7 +31,7 @@ class GameController {
 		return snapshot
 	}
 
-	syncRoomStateBySnapshot(state: GameRoomState, snapshot: Snapshot) {
+	syncRoomStateBySnapshot(state: GameState, snapshot: Snapshot) {
 		state.frame = Number(snapshot.id)
 		state.time = snapshot.time
 
@@ -73,13 +74,13 @@ class GameController {
 	}
 
 	handleRotate(
-		client: Client,
+		channel: ServerChannel,
 		message: {
 			action: 'start' | 'stop'
 			frame: number
 		}
 	) {
-		const playerId = client.userData?.playerId
+		const playerId = channel.userData?.playerId
 		const player = this.engine.game.world.getPlayerByID(playerId)
 
 		if (!player) {
@@ -89,17 +90,19 @@ class GameController {
 		switch (message.action) {
 			case 'start':
 				player.isRotating = true
+				channel.emit(GameEvents.ROTATE_START_ACK)
 				break
 			case 'stop':
 				player.isRotating = false
+				channel.emit(GameEvents.ROTATE_END_ACK)
 				break
 			default:
-				return client.error(500, `rotate message incorrect, got "${message}"`)
+				return console.error(`rotate message from ${playerId} is incorrect, got "${message}"`)
 		}
 	}
 
-	handleDash(client: Client) {
-		const playerId = client.userData?.playerId
+	handleDash(channel: ServerChannel) {
+		const playerId = channel.userData?.playerId
 		const player = this.engine.game.world.getPlayerByID(playerId)
 
 		if (!player) {
@@ -107,10 +110,12 @@ class GameController {
 		}
 
 		player.dash()
+
+		channel.emit(GameEvents.DASH_ACK)
 	}
 
-	handleShoot(client: Client, localBulletId: string | false): Bullet | false {
-		const playerId = client.userData?.playerId
+	handleShoot(channel: ServerChannel, localBulletId: ShootEventMessage): Bullet | false {
+		const playerId = channel.userData?.playerId
 		const player = this.engine.game.world.getPlayerByID(playerId)
 
 		if (!player) {
@@ -124,25 +129,31 @@ class GameController {
 			return false
 		}
 
-		if (localBulletId !== false) {
-			client.send('shoot_ack', {
-				localBulletId,
-				serverBulletId: bullet.id,
-				playerId: player.id,
-				playerBulletsAmount: player.bullets,
-			})
+		if (!localBulletId) {
+			channel.emit(
+				GameEvents.SHOOT_ACK,
+				{
+					localBulletId,
+					serverBulletId: bullet.id,
+					playerId: player.id,
+					playerBulletsAmount: player.bullets,
+				},
+				{
+					reliable: true,
+				}
+			)
 		}
 
 		return bullet
 	}
 
 	/** @returns Created player for newly joined client */
-	handlePlayerJoin(client: Client, options: any): ServerPlayer {
+	handlePlayerJoin(channel: ServerChannel, options: any): ServerPlayer {
 		const { playerId } = options
 		const player = this.engine.createPlayer(playerId)
 		this.engine.addPlayer(player)
 
-		client.userData = {
+		channel.userData = {
 			playerId,
 		}
 
@@ -150,8 +161,8 @@ class GameController {
 	}
 
 	/** @returns ID of disconnected player */
-	handlePlayerLeave(client: Client, consented: boolean): ServerPlayer['id'] {
-		const playerId = client.userData.playerId
+	handlePlayerLeave(channel: ServerChannel): ServerPlayer['id'] {
+		const playerId = channel.userData.playerId
 		this.engine.removePlayer(playerId)
 		return playerId
 	}

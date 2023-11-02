@@ -2,6 +2,7 @@ import Matter from 'matter-js'
 import * as PIXI from 'pixi.js'
 import { Assets } from 'pixi.js'
 import { Bullet as EngineBullet } from '@astroparty/engine'
+import { lerp } from '@astroparty/shared/utils'
 
 class Bullet extends PIXI.Sprite {
   engineBullet: EngineBullet
@@ -24,12 +25,12 @@ class Bullet extends PIXI.Sprite {
     // noop
   }
 
-  update(interpolation: number) {
+  update() {
     const position = this.engineBullet.body.position
     this.rotation = this.engineBullet.body.angle
     this.position.set(
-      this.position.x + (position.x - this.position.x) * interpolation,
-      this.position.y + (position.y - this.position.y) * interpolation
+      lerp(this.position.x, position.x, 0.4),
+      lerp(this.position.y, position.y, 0.4)
     )
   }
 }

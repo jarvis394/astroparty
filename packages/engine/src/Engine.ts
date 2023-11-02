@@ -6,19 +6,27 @@ import Player from './Player'
 class Engine {
   static MIN_FPS = 60
   static MIN_DELTA = 1000 / Engine.MIN_FPS
+  static _nowStartTime = Date.now()
 
   game: Game
   matterEngine: Matter.Engine
   frame: number
+  frameTimestamp: number
+  lastDelta: number
 
   constructor() {
     this.matterEngine = Matter.Engine.create({
       gravity: Matter.Vector.create(0, 0),
+      constraintIterations: 6,
+      positionIterations: 16,
+      world: Matter.World.create({}),
     })
     this.game = new Game({
       matterEngine: this.matterEngine,
     })
     this.frame = 0
+    this.frameTimestamp = this.getFrameTimestamp()
+    this.lastDelta = 0
   }
 
   public addPlayer(player: Player): Player {
@@ -35,10 +43,16 @@ class Engine {
     return player
   }
 
+  public getFrameTimestamp() {
+    return Date.now()
+  }
+
   public update(delta: number) {
     Matter.Engine.update(this.matterEngine, delta)
     this.game.update()
     this.frame += 1
+    this.frameTimestamp = this.getFrameTimestamp()
+    this.lastDelta = delta
   }
 
   public start() {
@@ -48,6 +62,10 @@ class Engine {
 
   public destroy() {
     Loop.stop()
+  }
+
+  public static now() {
+    return Date.now()
   }
 }
 
