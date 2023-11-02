@@ -67,7 +67,7 @@ export const generateSnapshot = (engine: Engine): Snapshot => {
 
   return {
     id: engine.frame.toString(),
-    time: Date.now(),
+    time: Engine.now(),
     state: {
       players,
       bullets,

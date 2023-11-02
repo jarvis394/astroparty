@@ -6,6 +6,7 @@ import Player from './Player'
 class Engine {
   static MIN_FPS = 60
   static MIN_DELTA = 1000 / Engine.MIN_FPS
+  static _nowStartTime = Date.now()
 
   game: Game
   matterEngine: Matter.Engine
@@ -61,6 +62,10 @@ class Engine {
 
   public destroy() {
     Loop.stop()
+  }
+
+  public static now() {
+    return Date.now()
   }
 }
 

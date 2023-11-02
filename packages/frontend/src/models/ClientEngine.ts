@@ -13,7 +13,7 @@ import {
   PlayerLeftEventMessage,
   ShootAckEventMessage,
 } from '@astroparty/shared/types/GameEvents'
-
+import map from '@astroparty/shared/utils/map'
 import { EventEmitter, Engine, Player, World } from '@astroparty/engine'
 import Matter from 'matter-js'
 import {
@@ -43,12 +43,19 @@ enum ClientInputAction {
   DASH,
 }
 
+enum ClientInputActionKeyCodes {
+  ROTATE = 'ArrowRight',
+  SHOOT = 'Space',
+}
+
 interface ClientInput {
   action: ClientInputAction
   time: number
 }
 
 export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
+  static DOUBLE_CLICK_TIMEFRAME = 500
+
   snapshots: SnapshotInterpolation
   clientSnapshotsVault: Vault
   engine: Engine
@@ -56,6 +63,8 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   channel: ClientChannel
   playerId: string | null
   keysPressed: Set<string> = new Set()
+  clickCounterMap: Map<string, { count: number; lastPressed: number }> =
+    new Map()
   clientInputHistory: ClientInput[]
   timeOffset: number
   private isHoldingShootButton = false
@@ -103,7 +112,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         this.handleInitRoom(message as InitEventMessage)
       })
       this.channel.on(GameEvents.UPDATE, (message) => {
-        this.handleRoomStateChange(message as Snapshot)
+        this.handleSnapshotRecieve(message as Snapshot)
       })
       this.channel.on(GameEvents.SHOOT_ACK, (message) => {
         this.handleShootAck(message as ShootAckEventMessage)
@@ -113,15 +122,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       })
       this.channel.on(GameEvents.PLAYER_LEFT, (message) => {
         this.handlePlayerLeft(message as PlayerLeftEventMessage)
-      })
-      ;[
-        // GameEvents.DASH_ACK,
-        GameEvents.ROTATE_START_ACK,
-        GameEvents.ROTATE_END_ACK,
-      ].forEach((event) => {
-        this.channel.on(event, () => {
-          this.serverReconciliation()
-        })
       })
     })
   }
@@ -138,7 +138,18 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     enginePlayer.bullets = message.playerBulletsAmount
   }
 
-  reconcilePlayer(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
+  reconcilePlayer() {
+    const { serverSnapshot, playerSnapshot } = this.getLatestSnapshots()
+
+    if (serverSnapshot && playerSnapshot) {
+      this.reconcilePlayerBySnapshots(serverSnapshot, playerSnapshot)
+    }
+  }
+
+  reconcilePlayerBySnapshots(
+    serverSnapshot: Snapshot,
+    playerSnapshot: Snapshot
+  ) {
     const presentTime = playerSnapshot.time
     let currentTime = serverSnapshot.time
 
@@ -176,7 +187,18 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     }
   }
 
-  reconcileBullets(serverSnapshot: Snapshot, playerSnapshot: Snapshot) {
+  reconcileBullets() {
+    const { serverSnapshot, playerSnapshot } = this.getLatestSnapshots()
+
+    if (serverSnapshot && playerSnapshot) {
+      this.reconcileBulletsBySnapshots(serverSnapshot, playerSnapshot)
+    }
+  }
+
+  reconcileBulletsBySnapshots(
+    serverSnapshot: Snapshot,
+    playerSnapshot: Snapshot
+  ) {
     serverSnapshot.state.bullets.forEach((serverBullet) => {
       const engineBullet = this.engine.game.world.getBulletByID(serverBullet.id)
       const localBullet = playerSnapshot.state.bullets.find(
@@ -200,21 +222,19 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     })
   }
 
-  serverReconciliation() {
-    // Get latest snapshot from the server
+  getLatestSnapshots = (): {
+    serverSnapshot: Snapshot | undefined
+    playerSnapshot: Snapshot | undefined
+  } => {
     const serverSnapshot = this.snapshots.vault.get() as Snapshot | undefined
-    // Get latest player snapshot
     const playerSnapshot = this.clientSnapshotsVault.get() as
       | Snapshot
       | undefined
 
-    if (serverSnapshot && playerSnapshot) {
-      this.reconcilePlayer(serverSnapshot, playerSnapshot)
-      this.reconcileBullets(serverSnapshot, playerSnapshot)
-    }
+    return { serverSnapshot, playerSnapshot }
   }
 
-  reconcilePlayerByMeEngine() {
+  syncPlayerByMeEngine() {
     const clientPlayer = this.engine.game.me
     const serverPlayer = this.mePlayerEngine.game.me
 
@@ -223,7 +243,8 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     const offsetX = clientPlayer.body.position.x - serverPlayer.body.position.x
     const offsetY = clientPlayer.body.position.y - serverPlayer.body.position.y
     const offsetAngle = clientPlayer.angle - serverPlayer.angle
-    const positionCorrectionCoeff = 30
+    const positionCorrectionCoeff =
+      200 - map(Math.max(Math.abs(offsetX), Math.abs(offsetY)), 0, 20, 20, 100)
     const angleCorrectionCoeff = 60
 
     // Apply a step by step correction of the player's position
@@ -238,7 +259,9 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   }
 
   frameSync(interpolation: number) {
-    this.reconcilePlayerByMeEngine()
+    this.syncPlayerByMeEngine()
+
+    console.log(this.clickCounterMap.get('ArrowRight'))
 
     const serverTime =
       SnapshotInterpolation.Now() -
@@ -415,12 +438,22 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     }
   }
 
-  handleRoomStateChange(snapshot: Snapshot) {
+  handleSnapshotRecieve(snapshot: Snapshot) {
     this.snapshots.vault.add(snapshot)
     this.timeOffset = SnapshotInterpolation.Now() - snapshot.time
 
-    if (!this.engine.game.me?.isRotating && !this.engine.game.me?.isDashing) {
-      this.serverReconciliation()
+    const lastDashedMs = this.engine.game.me?.lastDashedMs || 0
+    const hasFinishedDashing =
+      lastDashedMs + Player.DASH_TIMEOUT_MS <= Engine.now()
+
+    this.reconcileBullets()
+
+    /**
+     * TODO: need to fix `reconcilePlayer()` function as it does some weird stuff
+     * TODO: when executed multiple times and an event is being replayed in `mePlayerEngine`
+     */
+    if (hasFinishedDashing) {
+      this.reconcilePlayer()
     }
   }
 
@@ -446,7 +479,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
     this.clientInputHistory.push({
       action: ClientInputAction.ROTATE_START,
-      time: Date.now(),
+      time: Engine.now(),
     })
 
     this.engine.game.me.isRotating = true
@@ -468,7 +501,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
     this.clientInputHistory.push({
       action: ClientInputAction.DASH,
-      time: Date.now(),
+      time: Engine.now(),
     })
 
     if (!MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED) {
@@ -487,7 +520,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
     this.clientInputHistory.push({
       action: ClientInputAction.SHOOT,
-      time: Date.now(),
+      time: Engine.now(),
     })
 
     this.isHoldingShootButton = true
@@ -509,7 +542,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
     this.clientInputHistory.push({
       action: ClientInputAction.ROTATE_END,
-      time: Date.now(),
+      time: Engine.now(),
     })
 
     this.engine.game.me.isRotating = false
@@ -518,18 +551,19 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
   handleKeyDown(keyCode: string) {
     switch (keyCode) {
-      // Поворот направо
-      case 'ArrowRight': {
+      case ClientInputActionKeyCodes.ROTATE: {
+        const clickCount =
+          this.clickCounterMap.get(ClientInputActionKeyCodes.ROTATE)?.count || 0
+
+        if (clickCount > 0 && clickCount % 2 === 0) {
+          this.handleDash()
+          return
+        }
+
         this.handleRotateStart()
         break
       }
-      // Прыжок
-      case 'KeyW': {
-        this.handleDash()
-        break
-      }
-      // Выстрел
-      case 'Space': {
+      case ClientInputActionKeyCodes.SHOOT: {
         this.handleShoot()
         break
       }
@@ -537,20 +571,28 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   }
 
   onKeyDown(e: KeyboardEvent) {
+    const now = Engine.now()
+    const prevLastPressed = this.clickCounterMap.get(e.code)?.lastPressed || 0
+    const prevCount = this.clickCounterMap.get(e.code)?.count || 0
+    const isOutOfDoubleClickTimeframe =
+      now - prevLastPressed >= ClientEngine.DOUBLE_CLICK_TIMEFRAME
+
     this.keysPressed.add(e.code)
+    this.clickCounterMap.set(e.code, {
+      count: isOutOfDoubleClickTimeframe ? 1 : prevCount + 1,
+      lastPressed: Engine.now(),
+    })
   }
 
   onKeyUp(e: KeyboardEvent) {
     this.keysPressed.delete(e.code)
 
     switch (e.code) {
-      // Поворот направо
-      case 'ArrowRight': {
+      case ClientInputActionKeyCodes.ROTATE: {
         this.handleRotateStop()
         break
       }
-      // Выстрел
-      case 'Space': {
+      case ClientInputActionKeyCodes.SHOOT: {
         this.isHoldingShootButton = false
         break
       }

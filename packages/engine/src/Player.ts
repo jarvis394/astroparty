@@ -4,6 +4,7 @@ import { degreesToRadian } from '@astroparty/shared/utils'
 import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
 import Bullet from './Bullet'
 import getAngleVector from './utils/getAngleVector'
+import Engine from './Engine'
 
 export enum AliveState {
   ALIVE,
@@ -91,7 +92,7 @@ class Player {
   public dash(): boolean {
     if (this.aliveState !== AliveState.ALIVE) return false
 
-    const now = Date.now()
+    const now = Engine.now()
 
     if (this.lastDashedMs + Player.DASH_TIMEOUT_MS <= now) {
       this.lastDashedMs = now
