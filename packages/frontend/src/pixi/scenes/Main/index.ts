@@ -200,7 +200,7 @@ class MainScene extends PIXIObject {
       player.update(interpolation)
     })
     this.bullets.forEach((bullet) => {
-      bullet.update(interpolation)
+      bullet.update()
     })
     this.debug.update()
   }

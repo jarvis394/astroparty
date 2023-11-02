@@ -54,7 +54,7 @@ interface ClientInput {
 }
 
 export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
-  static DOUBLE_CLICK_TIMEFRAME = 500
+  static DOUBLE_CLICK_TIMEFRAME = 300
 
   snapshots: SnapshotInterpolation
   clientSnapshotsVault: Vault
@@ -63,10 +63,10 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   channel: ClientChannel
   playerId: string | null
   keysPressed: Set<string> = new Set()
-  clickCounterMap: Map<string, { count: number; lastPressed: number }> =
-    new Map()
   clientInputHistory: ClientInput[]
   timeOffset: number
+  private rotateDoubleTapTimer: NodeJS.Timeout | null = null
+  private rotateDoubleTapWaiting = false
   private isHoldingShootButton = false
 
   constructor(engine: Engine, playerId: string | null) {
@@ -260,8 +260,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
   frameSync(interpolation: number) {
     this.syncPlayerByMeEngine()
-
-    console.log(this.clickCounterMap.get('ArrowRight'))
 
     const serverTime =
       SnapshotInterpolation.Now() -
@@ -552,14 +550,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   handleKeyDown(keyCode: string) {
     switch (keyCode) {
       case ClientInputActionKeyCodes.ROTATE: {
-        const clickCount =
-          this.clickCounterMap.get(ClientInputActionKeyCodes.ROTATE)?.count || 0
-
-        if (clickCount > 0 && clickCount % 2 === 0) {
-          this.handleDash()
-          return
-        }
-
         this.handleRotateStart()
         break
       }
@@ -570,18 +560,29 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     }
   }
 
+  handleRotateDoubleTap() {
+    if (this.rotateDoubleTapWaiting) {
+      this.rotateDoubleTapWaiting = false
+      clearTimeout(this.rotateDoubleTapTimer ?? undefined)
+      this.handleDash()
+    } else {
+      this.rotateDoubleTapWaiting = true
+      this.rotateDoubleTapTimer = setTimeout(
+        () => (this.rotateDoubleTapWaiting = false),
+        ClientEngine.DOUBLE_CLICK_TIMEFRAME
+      )
+    }
+  }
+
   onKeyDown(e: KeyboardEvent) {
-    const now = Engine.now()
-    const prevLastPressed = this.clickCounterMap.get(e.code)?.lastPressed || 0
-    const prevCount = this.clickCounterMap.get(e.code)?.count || 0
-    const isOutOfDoubleClickTimeframe =
-      now - prevLastPressed >= ClientEngine.DOUBLE_CLICK_TIMEFRAME
+    const isRotateButton = e.code === ClientInputActionKeyCodes.ROTATE
+    const justPressed = !this.keysPressed.has(e.code)
+
+    if (isRotateButton && justPressed) {
+      this.handleRotateDoubleTap()
+    }
 
     this.keysPressed.add(e.code)
-    this.clickCounterMap.set(e.code, {
-      count: isOutOfDoubleClickTimeframe ? 1 : prevCount + 1,
-      lastPressed: Engine.now(),
-    })
   }
 
   onKeyUp(e: KeyboardEvent) {
