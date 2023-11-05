@@ -35,7 +35,7 @@ const App: React.FC = () => {
   return (
     <>
       <div id={PIXI_CANVAS_CONTAINER_ID} ref={canvasContainer} />
-      <MatterRender engine={engine.current.matterEngine} />
+      {/* <MatterRender engine={engine.current.matterEngine} /> */}
     </>
   )
 }

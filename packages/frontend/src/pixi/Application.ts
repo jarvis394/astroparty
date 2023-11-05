@@ -14,6 +14,7 @@ export default class Application extends PIXI.Application<HTMLCanvasElement> {
       backgroundAlpha: 0,
       antialias: true,
       autoDensity: true,
+      resizeTo: window,
       ...props,
     })
 

@@ -72,16 +72,49 @@ class KeysPressedDebug extends PIXI.Container {
   }
 }
 
+class PingDebug extends PIXI.Container {
+  clientEngine: ClientEngine
+  text: PIXI.Text
+
+  constructor(clientEngine: ClientEngine) {
+    super()
+    this.clientEngine = clientEngine
+
+    this.text = new PIXI.Text(this.getText(), {
+      fontFamily: 'Roboto',
+      fill: '#ffffff',
+      fontSize: 16,
+    })
+    this.position.set(16, 16)
+    this.addChild(this.text)
+  }
+
+  getText() {
+    const keysPressed: string[] = []
+    this.clientEngine.keysPressed.forEach((keyCode) =>
+      keysPressed.push(keyCode)
+    )
+
+    return `ping: ${this.clientEngine.timeOffset}`
+  }
+
+  update() {
+    this.text.text = this.getText()
+  }
+}
+
 class Debug extends PIXI.Container {
   clientEngine: ClientEngine
   playersDebug: Map<Player['id'], PlayerDebug>
   keysPressedDebug: KeysPressedDebug
+  pingDebug: PingDebug
 
   constructor(clientEngine: ClientEngine) {
     super()
     this.clientEngine = clientEngine
     this.playersDebug = new Map()
     this.keysPressedDebug = new KeysPressedDebug(clientEngine)
+    this.pingDebug = new PingDebug(clientEngine)
 
     for (const enginePlayer of clientEngine.engine.game.world.getAllPlayersIterator()) {
       const component = new PlayerDebug(enginePlayer, this.playersDebug.size)
@@ -90,6 +123,7 @@ class Debug extends PIXI.Container {
     }
 
     this.addChild(this.keysPressedDebug)
+    this.addChild(this.pingDebug)
   }
 
   update() {
@@ -106,6 +140,7 @@ class Debug extends PIXI.Container {
     })
 
     this.keysPressedDebug.update()
+    this.pingDebug.update()
   }
 }
 

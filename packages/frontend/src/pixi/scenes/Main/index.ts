@@ -7,6 +7,8 @@ import { Graphics } from 'pixi.js'
 import { ClientEngine, ClientEngineEvents } from 'src/models/ClientEngine'
 import Debug from 'src/pixi/components/Debug'
 import { Snapshot, SnapshotPlayer } from '@astroparty/shared/game/Snapshot'
+import { Viewport } from 'pixi-viewport'
+import Matter from 'matter-js'
 
 class MainScene extends PIXIObject {
   app: Application
@@ -15,6 +17,7 @@ class MainScene extends PIXIObject {
   debug: Debug
   clientEngine: ClientEngine
   playerId: string | null
+  viewport: Viewport
 
   constructor(app: Application, engine: Engine) {
     super(app, engine)
@@ -24,22 +27,24 @@ class MainScene extends PIXIObject {
     this.bullets = new Map()
     this.playerId = params.get('id')
     this.clientEngine = new ClientEngine(engine, this.playerId)
-
-    this.position.set(
-      window.innerWidth / 2 - World.WORLD_WIDTH / 2,
-      window.innerHeight / 2 - World.WORLD_HEIGHT / 2
-    )
+    this.viewport = new Viewport({
+      events: app.renderer.events,
+      worldHeight: World.WORLD_HEIGHT + 32 * 2,
+      worldWidth: World.WORLD_WIDTH + 32 * 2,
+      screenWidth: window.innerWidth,
+      screenHeight: window.innerHeight,
+    })
 
     for (const player of this.clientEngine.engine.game.world.getAllPlayersIterator()) {
       const pixiPlayer = new Player(player)
       this.players.set(player.id, pixiPlayer)
-      this.addChild(pixiPlayer)
+      this.viewport.addChild(pixiPlayer)
     }
 
     for (const bullet of this.clientEngine.engine.game.world.getAllBulletsIterator()) {
       const pixiBullet = new Bullet(bullet)
       this.bullets.set(bullet.id, pixiBullet)
-      this.addChild(pixiBullet)
+      this.viewport.addChild(pixiBullet)
     }
 
     this.clientEngine.engine.game.world.addEventListener(
@@ -51,19 +56,40 @@ class MainScene extends PIXIObject {
       this.handleBulletDespawn.bind(this)
     )
 
+    const worldBorder = new Graphics()
+    worldBorder.lineStyle({
+      color: 0xffffff,
+      width: 2,
+    })
+    worldBorder.drawRect(0, 0, World.WORLD_WIDTH, World.WORLD_HEIGHT)
+    this.viewport.addChild(worldBorder)
+
     const rect = new Graphics()
     rect.lineStyle({
       color: 0xffffff,
       width: 2,
     })
-    rect.drawRect(0, 0, World.WORLD_WIDTH, World.WORLD_HEIGHT)
-    this.addChild(rect)
+    rect.drawRect(
+      World.WORLD_WIDTH / 2 - 50,
+      World.WORLD_HEIGHT / 2 - 50,
+      100,
+      100
+    )
+    this.viewport.addChild(rect)
 
     this.debug = new Debug(this.clientEngine)
     this.addChild(this.debug)
 
+    this.initViewport()
+
     this.clientEngine.init()
     this.clientEngine.engine.start()
+  }
+
+  initViewport() {
+    this.viewport.moveCenter(World.WORLD_WIDTH / 2, World.WORLD_HEIGHT / 2)
+    this.viewport.fit(true)
+    this.addChild(this.viewport)
   }
 
   handleBulletSpawn(bulletId: string) {
@@ -77,7 +103,7 @@ class MainScene extends PIXIObject {
 
     const pixiBullet = new Bullet(bullet)
     this.bullets.set(bullet.id, pixiBullet)
-    this.addChild(pixiBullet)
+    this.viewport.addChild(pixiBullet)
   }
 
   handleBulletDespawn(bulletId: string) {
@@ -90,7 +116,7 @@ class MainScene extends PIXIObject {
     }
 
     this.bullets.delete(bulletId)
-    const bullet = this.children.find((e) => {
+    const bullet = this.viewport.children.find((e) => {
       if (e instanceof Bullet && e.engineBullet.id === bulletId) {
         return e
       }
@@ -100,7 +126,7 @@ class MainScene extends PIXIObject {
       throw new Error(`На stage не найден объект Bullet с id ${bulletId}`)
     }
 
-    this.removeChild(bullet)
+    this.viewport.removeChild(bullet)
   }
 
   handleInitRoom(snapshot: Snapshot) {
@@ -119,7 +145,7 @@ class MainScene extends PIXIObject {
 
       const pixiPlayer = new Player(enginePlayer)
       this.players.set(serverPlayer.id, pixiPlayer)
-      this.addChild(pixiPlayer)
+      this.viewport.addChild(pixiPlayer)
     })
 
     Object.values(snapshot.state.bullets).forEach((serverBullet) => {
@@ -135,7 +161,7 @@ class MainScene extends PIXIObject {
 
       const pixiBullet = new Bullet(engineBullet)
       this.bullets.set(serverBullet.id, pixiBullet)
-      this.addChild(pixiBullet)
+      this.viewport.addChild(pixiBullet)
     })
   }
 
@@ -154,13 +180,13 @@ class MainScene extends PIXIObject {
 
     const pixiPlayer = new Player(enginePlayer)
     this.players.set(enginePlayer.id, pixiPlayer)
-    this.addChild(pixiPlayer)
+    this.viewport.addChild(pixiPlayer)
   }
 
   handlePlayerLeft(playerId: string) {
     if (!this.playerId) return
 
-    const pixiPlayer = this.children.find((e) => {
+    const pixiPlayer = this.viewport.children.find((e) => {
       if (e instanceof Player && e.enginePlayer.id === playerId) {
         return e
       }
@@ -170,7 +196,7 @@ class MainScene extends PIXIObject {
       throw new Error(`На stage не найден объект Player с id ${playerId}`)
     }
 
-    this.removeChild(pixiPlayer)
+    this.viewport.removeChild(pixiPlayer)
     this.players.delete(playerId)
   }
 
@@ -193,6 +219,61 @@ class MainScene extends PIXIObject {
     )
   }
 
+  fitViewport() {
+    const min: Matter.Vector = {
+      x: World.WORLD_WIDTH * 2,
+      y: World.WORLD_HEIGHT * 2,
+    }
+    const max: Matter.Vector = { x: 0, y: 0 }
+
+    this.engine.game.world.players.forEach((player) => {
+      const { x, y } = player.body.position
+
+      min.x = Math.min(x - 32, min.x)
+      min.y = Math.min(y - 32, min.y)
+      max.x = Math.max(x + 32, max.x)
+      max.y = Math.max(y + 32, max.y)
+    })
+
+    let x = (max.x - min.x) / 2 + min.x
+    let y = (max.y - min.y) / 2 + min.y
+    let scale = Math.min(
+      window.innerWidth / (max.x - min.x + 64),
+      window.innerHeight / (max.y - min.y + 64)
+    )
+    // let width = World.WORLD_WIDTH * 2
+
+    // if (scale < 1) {
+    //   scale = 1
+    // }
+
+    // if (scale > 1.5) {
+    //   scale = 1.5
+    // }
+
+    if (this.engine.game.world.players.size === 1) {
+      x = max.x
+      y = max.y
+      scale = 1
+    }
+
+    if (this.engine.game.world.players.size === 0) {
+      x = World.WORLD_WIDTH / 2
+      y = World.WORLD_HEIGHT / 2
+      scale = 1
+    }
+
+    this.viewport.animate({
+      time: 100,
+      position: { x, y },
+      height: window.innerHeight,
+      width: window.innerWidth,
+      scale,
+      ease: 'linear',
+      removeOnInterrupt: false,
+    })
+  }
+
   update(interpolation: number) {
     this.clientEngine.frameSync(interpolation)
 
@@ -203,6 +284,8 @@ class MainScene extends PIXIObject {
       bullet.update()
     })
     this.debug.update()
+
+    // this.fitViewport()
   }
 }
 
