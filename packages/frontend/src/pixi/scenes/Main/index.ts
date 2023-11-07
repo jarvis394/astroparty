@@ -7,8 +7,7 @@ import { Graphics } from 'pixi.js'
 import { ClientEngine, ClientEngineEvents } from 'src/models/ClientEngine'
 import Debug from 'src/pixi/components/Debug'
 import { Snapshot, SnapshotPlayer } from '@astroparty/shared/game/Snapshot'
-import { Viewport } from 'pixi-viewport'
-import Matter from 'matter-js'
+import Viewport from './Viewport'
 
 class MainScene extends PIXIObject {
   app: Application
@@ -27,13 +26,8 @@ class MainScene extends PIXIObject {
     this.bullets = new Map()
     this.playerId = params.get('id')
     this.clientEngine = new ClientEngine(engine, this.playerId)
-    this.viewport = new Viewport({
-      events: app.renderer.events,
-      worldHeight: World.WORLD_HEIGHT + 32 * 2,
-      worldWidth: World.WORLD_WIDTH + 32 * 2,
-      screenWidth: window.innerWidth,
-      screenHeight: window.innerHeight,
-    })
+    this.viewport = new Viewport(app, engine)
+    this.debug = new Debug(this.clientEngine)
 
     for (const player of this.clientEngine.engine.game.world.getAllPlayersIterator()) {
       const pixiPlayer = new Player(player)
@@ -77,19 +71,11 @@ class MainScene extends PIXIObject {
     )
     this.viewport.addChild(rect)
 
-    this.debug = new Debug(this.clientEngine)
     this.addChild(this.debug)
-
-    this.initViewport()
+    this.addChild(this.viewport.root)
 
     this.clientEngine.init()
     this.clientEngine.engine.start()
-  }
-
-  initViewport() {
-    this.viewport.moveCenter(World.WORLD_WIDTH / 2, World.WORLD_HEIGHT / 2)
-    this.viewport.fit(true)
-    this.addChild(this.viewport)
   }
 
   handleBulletSpawn(bulletId: string) {
@@ -219,61 +205,6 @@ class MainScene extends PIXIObject {
     )
   }
 
-  fitViewport() {
-    const min: Matter.Vector = {
-      x: World.WORLD_WIDTH * 2,
-      y: World.WORLD_HEIGHT * 2,
-    }
-    const max: Matter.Vector = { x: 0, y: 0 }
-
-    this.engine.game.world.players.forEach((player) => {
-      const { x, y } = player.body.position
-
-      min.x = Math.min(x - 32, min.x)
-      min.y = Math.min(y - 32, min.y)
-      max.x = Math.max(x + 32, max.x)
-      max.y = Math.max(y + 32, max.y)
-    })
-
-    let x = (max.x - min.x) / 2 + min.x
-    let y = (max.y - min.y) / 2 + min.y
-    let scale = Math.min(
-      window.innerWidth / (max.x - min.x + 64),
-      window.innerHeight / (max.y - min.y + 64)
-    )
-    // let width = World.WORLD_WIDTH * 2
-
-    // if (scale < 1) {
-    //   scale = 1
-    // }
-
-    // if (scale > 1.5) {
-    //   scale = 1.5
-    // }
-
-    if (this.engine.game.world.players.size === 1) {
-      x = max.x
-      y = max.y
-      scale = 1
-    }
-
-    if (this.engine.game.world.players.size === 0) {
-      x = World.WORLD_WIDTH / 2
-      y = World.WORLD_HEIGHT / 2
-      scale = 1
-    }
-
-    this.viewport.animate({
-      time: 100,
-      position: { x, y },
-      height: window.innerHeight,
-      width: window.innerWidth,
-      scale,
-      ease: 'linear',
-      removeOnInterrupt: false,
-    })
-  }
-
   update(interpolation: number) {
     this.clientEngine.frameSync(interpolation)
 
@@ -285,7 +216,7 @@ class MainScene extends PIXIObject {
     })
     this.debug.update()
 
-    // this.fitViewport()
+    this.viewport.fit()
   }
 }
 
