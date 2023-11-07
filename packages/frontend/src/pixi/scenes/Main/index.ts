@@ -7,6 +7,7 @@ import { Graphics } from 'pixi.js'
 import { ClientEngine, ClientEngineEvents } from 'src/models/ClientEngine'
 import Debug from 'src/pixi/components/Debug'
 import { Snapshot, SnapshotPlayer } from '@astroparty/shared/game/Snapshot'
+import Viewport from './Viewport'
 
 class MainScene extends PIXIObject {
   app: Application
@@ -15,6 +16,7 @@ class MainScene extends PIXIObject {
   debug: Debug
   clientEngine: ClientEngine
   playerId: string | null
+  viewport: Viewport
 
   constructor(app: Application, engine: Engine) {
     super(app, engine)
@@ -24,22 +26,19 @@ class MainScene extends PIXIObject {
     this.bullets = new Map()
     this.playerId = params.get('id')
     this.clientEngine = new ClientEngine(engine, this.playerId)
-
-    this.position.set(
-      window.innerWidth / 2 - World.WORLD_WIDTH / 2,
-      window.innerHeight / 2 - World.WORLD_HEIGHT / 2
-    )
+    this.viewport = new Viewport(app, engine)
+    this.debug = new Debug(this.clientEngine)
 
     for (const player of this.clientEngine.engine.game.world.getAllPlayersIterator()) {
       const pixiPlayer = new Player(player)
       this.players.set(player.id, pixiPlayer)
-      this.addChild(pixiPlayer)
+      this.viewport.addChild(pixiPlayer)
     }
 
     for (const bullet of this.clientEngine.engine.game.world.getAllBulletsIterator()) {
       const pixiBullet = new Bullet(bullet)
       this.bullets.set(bullet.id, pixiBullet)
-      this.addChild(pixiBullet)
+      this.viewport.addChild(pixiBullet)
     }
 
     this.clientEngine.engine.game.world.addEventListener(
@@ -51,16 +50,29 @@ class MainScene extends PIXIObject {
       this.handleBulletDespawn.bind(this)
     )
 
+    const worldBorder = new Graphics()
+    worldBorder.lineStyle({
+      color: 0xffffff,
+      width: 2,
+    })
+    worldBorder.drawRect(0, 0, World.WORLD_WIDTH, World.WORLD_HEIGHT)
+    this.viewport.addChild(worldBorder)
+
     const rect = new Graphics()
     rect.lineStyle({
       color: 0xffffff,
       width: 2,
     })
-    rect.drawRect(0, 0, World.WORLD_WIDTH, World.WORLD_HEIGHT)
-    this.addChild(rect)
+    rect.drawRect(
+      World.WORLD_WIDTH / 2 - 50,
+      World.WORLD_HEIGHT / 2 - 50,
+      100,
+      100
+    )
+    this.viewport.addChild(rect)
 
-    this.debug = new Debug(this.clientEngine)
     this.addChild(this.debug)
+    this.addChild(this.viewport.root)
 
     this.clientEngine.init()
     this.clientEngine.engine.start()
@@ -77,7 +89,7 @@ class MainScene extends PIXIObject {
 
     const pixiBullet = new Bullet(bullet)
     this.bullets.set(bullet.id, pixiBullet)
-    this.addChild(pixiBullet)
+    this.viewport.addChild(pixiBullet)
   }
 
   handleBulletDespawn(bulletId: string) {
@@ -90,7 +102,7 @@ class MainScene extends PIXIObject {
     }
 
     this.bullets.delete(bulletId)
-    const bullet = this.children.find((e) => {
+    const bullet = this.viewport.children.find((e) => {
       if (e instanceof Bullet && e.engineBullet.id === bulletId) {
         return e
       }
@@ -100,7 +112,7 @@ class MainScene extends PIXIObject {
       throw new Error(`На stage не найден объект Bullet с id ${bulletId}`)
     }
 
-    this.removeChild(bullet)
+    this.viewport.removeChild(bullet)
   }
 
   handleInitRoom(snapshot: Snapshot) {
@@ -119,7 +131,7 @@ class MainScene extends PIXIObject {
 
       const pixiPlayer = new Player(enginePlayer)
       this.players.set(serverPlayer.id, pixiPlayer)
-      this.addChild(pixiPlayer)
+      this.viewport.addChild(pixiPlayer)
     })
 
     Object.values(snapshot.state.bullets).forEach((serverBullet) => {
@@ -135,7 +147,7 @@ class MainScene extends PIXIObject {
 
       const pixiBullet = new Bullet(engineBullet)
       this.bullets.set(serverBullet.id, pixiBullet)
-      this.addChild(pixiBullet)
+      this.viewport.addChild(pixiBullet)
     })
   }
 
@@ -154,13 +166,13 @@ class MainScene extends PIXIObject {
 
     const pixiPlayer = new Player(enginePlayer)
     this.players.set(enginePlayer.id, pixiPlayer)
-    this.addChild(pixiPlayer)
+    this.viewport.addChild(pixiPlayer)
   }
 
   handlePlayerLeft(playerId: string) {
     if (!this.playerId) return
 
-    const pixiPlayer = this.children.find((e) => {
+    const pixiPlayer = this.viewport.children.find((e) => {
       if (e instanceof Player && e.enginePlayer.id === playerId) {
         return e
       }
@@ -170,7 +182,7 @@ class MainScene extends PIXIObject {
       throw new Error(`На stage не найден объект Player с id ${playerId}`)
     }
 
-    this.removeChild(pixiPlayer)
+    this.viewport.removeChild(pixiPlayer)
     this.players.delete(playerId)
   }
 
@@ -203,6 +215,8 @@ class MainScene extends PIXIObject {
       bullet.update()
     })
     this.debug.update()
+
+    this.viewport.fit()
   }
 }
 

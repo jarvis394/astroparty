@@ -7118,10 +7118,10 @@ pify@^5.0.0:
   resolved "https://registry.npmjs.org/pify/-/pify-5.0.0.tgz"
   integrity sha512-eW/gHNMlxdSP6dmG6uJip6FXN0EQBwm2clYYd8Wul42Cwu/DK8HEftzsapcNdYe2MfLiIwZqsDk2RDEsTE79hA==
 
-pixi-viewport@^5.0.1:
-  version "5.0.1"
-  resolved "https://registry.npmjs.org/pixi-viewport/-/pixi-viewport-5.0.1.tgz"
-  integrity sha512-fIILU9xztqGnhGF5SYfjn1Rir/7asWkJ8zSUay2hwzPrdGTWFtB4yiIlZDeFaLf7KHA04RRb2kI01Sy1kNksAw==
+pixi-viewport@^5.0.2:
+  version "5.0.2"
+  resolved "https://registry.yarnpkg.com/pixi-viewport/-/pixi-viewport-5.0.2.tgz#d0065bd28a3c34d5888ce66eff538fa78ef5cd07"
+  integrity sha512-U77KnCTl81xEgxEQRFEuI7MYVySWwCVkA41EnM8KiOYwgVOwdBUa7318O+u61IOnTwnoYLzaihy/kpoONKU13Q==
 
 pixi.js@^7.2.4:
   version "7.2.4"
