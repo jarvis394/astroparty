@@ -3,6 +3,7 @@ import Bullet, { BulletConstructorProps } from './Bullet'
 import Player, { AliveState } from './Player'
 import EventEmitter from './EventEmitter'
 import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
+import AttractionSphere from './AttractionSphere'
 
 export enum WorldEvents {
   BULLET_SPAWN = 'bullet_spawn',
@@ -19,14 +20,16 @@ type WorldEmitterEvents = {
 }
 
 class World extends EventEmitter<WorldEmitterEvents> {
-  public static WORLD_HEIGHT = 1024
-  public static WORLD_WIDTH = 1024
+  public static WORLD_HEIGHT = 1100
+  public static WORLD_WIDTH = 1100
   public static WALL_COLLISION_CATEGORY = 0x0001
   private static WALL_HEIGHT = 50
   private static WALL_PREFIX = 'wall'
 
   instance: Matter.World
+  matterEngine: Matter.Engine
   walls: Matter.Body[]
+  attractors: AttractionSphere[] = []
   bullets: Map<string, Bullet> = new Map()
   players: Map<string, Player> = new Map()
   // TODO: убрать, юзать айдишники из бд
@@ -36,40 +39,22 @@ class World extends EventEmitter<WorldEmitterEvents> {
   constructor({ matterEngine }: { matterEngine: Matter.Engine }) {
     super()
     this.instance = matterEngine.world
+    this.matterEngine = matterEngine
     this.walls = this.addWorldWalls()
     this.addObstacles()
+    this.attractors = [
+      new AttractionSphere(
+        { x: World.WORLD_WIDTH / 4, y: World.WORLD_HEIGHT / 2 },
+        this
+      ),
+      new AttractionSphere(
+        { x: (World.WORLD_WIDTH / 4) * 3, y: World.WORLD_HEIGHT / 2 },
+        this
+      ),
+    ]
 
     Matter.Events.on(matterEngine, 'collisionStart', (event) => {
-      for (const { bodyA, bodyB } of event.pairs) {
-        const [a, b] = [bodyA, bodyB].sort((a) => (Bullet.isBullet(a) ? -1 : 1))
-        const bulletId = Bullet.getIdFromLabel(a.label)
-        const playerId = Player.getIdFromLabel(b.label)
-        const player = this.players.get(playerId)
-        const bullet = this.bullets.get(bulletId)
-
-        if (
-          player &&
-          bullet &&
-          Bullet.isBullet(a) &&
-          Player.isPlayer(b) &&
-          player.isOpponent &&
-          bullet.playerId !== player.id &&
-          this.bullets.has(bulletId)
-        ) {
-          Matter.World.remove(this.instance, a)
-          this.eventEmitter.emit(WorldEvents.BULLET_DESPAWN, bulletId)
-          if (player.aliveState === AliveState.ALIVE) {
-            player.aliveState = AliveState.CRAFT_DESTROYED
-          }
-          return this.bullets.delete(bulletId)
-        }
-
-        if (this.bullets.has(bulletId) && b.label === World.WALL_PREFIX) {
-          Matter.World.remove(this.instance, a)
-          this.eventEmitter.emit(WorldEvents.BULLET_DESPAWN, bulletId)
-          return this.bullets.delete(bulletId)
-        }
-      }
+      this.handleBulletCollisions(event)
     })
   }
 
@@ -92,13 +77,14 @@ class World extends EventEmitter<WorldEmitterEvents> {
       Matter.Vector.create(100, World.WORLD_HEIGHT - 100),
     ]
     const n = this.players.size % spawnPositions.length
-
-    return new Player({
+    const player = new Player({
       id,
       position: spawnPositions[n],
       shipSprite: ShipSprite.BLUE,
       world: this,
     })
+
+    return player
   }
 
   public createBullet({
@@ -114,6 +100,7 @@ class World extends EventEmitter<WorldEmitterEvents> {
   public addPlayer(player: Player): Player {
     this.players.set(player.id, player)
     this.eventEmitter.emit(WorldEvents.PLAYER_SPAWN, player.id)
+    Matter.World.addBody(this.instance, player.body)
     return player
   }
 
@@ -161,6 +148,37 @@ class World extends EventEmitter<WorldEmitterEvents> {
     this.bullets.forEach((bullet) => {
       bullet.update()
     })
+  }
+
+  private handleBulletCollisions(event: Matter.IEventCollision<Matter.Engine>) {
+    for (const { bodyA, bodyB } of event.pairs) {
+      const [a, b] = [bodyA, bodyB].sort((a) => (Bullet.isBullet(a) ? -1 : 1))
+      const bulletId = Bullet.getIdFromLabel(a.label)
+      const playerId = Player.getIdFromLabel(b.label)
+      const player = this.players.get(playerId)
+      const bullet = this.bullets.get(bulletId)
+
+      if (
+        player &&
+        bullet &&
+        Bullet.isBullet(a) &&
+        Player.isPlayer(b) &&
+        this.bullets.has(bulletId)
+      ) {
+        Matter.World.remove(this.instance, a)
+        this.eventEmitter.emit(WorldEvents.BULLET_DESPAWN, bulletId)
+        if (player.aliveState === AliveState.ALIVE) {
+          player.aliveState = AliveState.CRAFT_DESTROYED
+        }
+        return this.bullets.delete(bulletId)
+      }
+
+      if (this.bullets.has(bulletId) && b.label === World.WALL_PREFIX) {
+        Matter.World.remove(this.instance, a)
+        this.eventEmitter.emit(WorldEvents.BULLET_DESPAWN, bulletId)
+        return this.bullets.delete(bulletId)
+      }
+    }
   }
 
   private addWorldWalls(): Matter.Body[] {

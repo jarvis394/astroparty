@@ -8,11 +8,13 @@ import { ClientEngine, ClientEngineEvents } from 'src/models/ClientEngine'
 import Debug from 'src/pixi/components/Debug'
 import { Snapshot, SnapshotPlayer } from '@astroparty/shared/game/Snapshot'
 import Viewport from './Viewport'
+import Attractor from 'src/pixi/components/Attractor'
 
 class MainScene extends PIXIObject {
   app: Application
   players: Map<string, Player>
   bullets: Map<string, Bullet>
+  attractors: Attractor[]
   debug: Debug
   clientEngine: ClientEngine
   playerId: string | null
@@ -24,10 +26,11 @@ class MainScene extends PIXIObject {
     this.app = app
     this.players = new Map()
     this.bullets = new Map()
+    this.attractors = []
     this.playerId = params.get('id')
     this.clientEngine = new ClientEngine(engine, this.playerId)
     this.viewport = new Viewport(app, engine)
-    this.debug = new Debug(this.clientEngine)
+    this.debug = new Debug(this.clientEngine, this.viewport)
 
     for (const player of this.clientEngine.engine.game.world.getAllPlayersIterator()) {
       const pixiPlayer = new Player(player)
@@ -39,6 +42,12 @@ class MainScene extends PIXIObject {
       const pixiBullet = new Bullet(bullet)
       this.bullets.set(bullet.id, pixiBullet)
       this.viewport.addChild(pixiBullet)
+    }
+
+    for (const attractor of this.clientEngine.engine.game.world.attractors) {
+      const pixiAttractor = new Attractor(attractor)
+      this.attractors.push(pixiAttractor)
+      this.viewport.addChild(pixiAttractor)
     }
 
     this.clientEngine.engine.game.world.addEventListener(
@@ -211,9 +220,15 @@ class MainScene extends PIXIObject {
     this.players.forEach((player) => {
       player.update(interpolation)
     })
+
     this.bullets.forEach((bullet) => {
       bullet.update()
     })
+
+    this.attractors.forEach((attractor) => {
+      attractor.update(interpolation)
+    })
+
     this.debug.update()
 
     this.viewport.fit()

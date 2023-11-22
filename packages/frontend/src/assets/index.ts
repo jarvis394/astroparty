@@ -4,6 +4,7 @@ import shipRed from 'src/assets/ship/red.png'
 import shipGreen from 'src/assets/ship/green.png'
 import shipPurple from 'src/assets/ship/pruple.png'
 import bullet from 'src/assets/bullet.png'
+import attractionSphere from 'src/assets/attraction_sphere.png'
 import { Assets } from 'pixi.js'
 
 export const shipSprites: Record<ShipSprite, string> = {
@@ -24,7 +25,7 @@ export const loadAssets = async () => {
   const keys: string[] = []
 
   addToAssets(shipSprites, keys)
-  addToAssets({ bullet }, keys)
+  addToAssets({ bullet, attractionSphere }, keys)
 
   return await Assets.load(keys)
 }

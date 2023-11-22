@@ -13,7 +13,6 @@ import {
   PlayerLeftEventMessage,
   ShootAckEventMessage,
 } from '@astroparty/shared/types/GameEvents'
-import map from '@astroparty/shared/utils/map'
 import { EventEmitter, Engine, Player, World } from '@astroparty/engine'
 import Matter from 'matter-js'
 import {
@@ -85,21 +84,17 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   }
 
   init() {
-    Matter.Events.on(this.engine.matterEngine, 'beforeUpdate', () => {
-      this.keysPressed.forEach((keyCode) => {
-        this.handleKeyDown(keyCode)
-      })
-
-      this.mePlayerEngine.update(Engine.MIN_DELTA)
-
-      const snapshot = this.generateSnapshotForClientEngine()
-      if (snapshot) {
-        this.clientSnapshotsVault.add(snapshot)
-      }
-    })
+    Matter.Events.on(
+      this.engine.matterEngine,
+      'beforeUpdate',
+      this.handleBeforeUpdate.bind(this)
+    )
 
     window.addEventListener('keydown', this.onKeyDown.bind(this))
     window.addEventListener('keyup', this.onKeyUp.bind(this))
+    window.addEventListener('touchstart', this.onTouchStart.bind(this))
+    window.addEventListener('touchmove', (e) => console.log(e))
+    window.addEventListener('touchend', this.onTouchEnd.bind(this))
   }
 
   async startGame() {
@@ -126,6 +121,31 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     })
   }
 
+  handleBeforeUpdate() {
+    this.keysPressed.forEach((keyCode) => {
+      this.handleKeyDown(keyCode)
+    })
+
+    const serverSnapshot = this.snapshots.vault.get() as Snapshot
+    const players = serverSnapshot?.state.players as
+      | Snapshot['state']['players']
+      | undefined
+    const bullets = serverSnapshot?.state.bullets as
+      | Snapshot['state']['bullets']
+      | undefined
+
+    players && restorePlayersFromSnapshot(this.engine, players)
+    bullets && restoreBulletsFromSnapshot(this.engine, bullets)
+
+    this.mePlayerEngine.update(Engine.MIN_DELTA)
+    this.reconcileEngine()
+
+    const snapshot = this.generateSnapshotForClientEngine()
+    if (snapshot) {
+      this.clientSnapshotsVault.add(snapshot)
+    }
+  }
+
   handleShootAck(message: ShootAckEventMessage) {
     const engineBullet = this.engine.game.world.getBulletByID(
       message.localBulletId
@@ -135,6 +155,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     if (!engineBullet || !enginePlayer) return
 
     engineBullet.setId(message.serverBulletId)
+    engineBullet.isAcknowledgedByServer = true
     enginePlayer.bullets = message.playerBulletsAmount
   }
 
@@ -207,17 +228,18 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
       if (!engineBullet || !localBullet) return
 
-      const offsetX = localBullet.positionX - serverBullet.positionX
-      const offsetY = localBullet.positionY - serverBullet.positionY
-      const correctionCoeff = 20
+      // TODO: attractors and bullet reconciliation for position doesn't work
+      // const offsetX = localBullet.positionX - serverBullet.positionX
+      // const offsetY = localBullet.positionY - serverBullet.positionY
+      // const correctionCoeff = 60
 
-      Matter.Body.setPosition(
-        engineBullet.body,
-        Matter.Vector.create(
-          engineBullet.body.position.x - offsetX / correctionCoeff,
-          engineBullet.body.position.y - offsetY / correctionCoeff
-        )
-      )
+      // Matter.Body.setPosition(
+      //   engineBullet.body,
+      //   Matter.Vector.create(
+      //     engineBullet.body.position.x - offsetX / correctionCoeff,
+      //     engineBullet.body.position.y - offsetY / correctionCoeff
+      //   )
+      // )
       Matter.Body.setAngle(engineBullet.body, serverBullet.angle)
     })
   }
@@ -243,8 +265,9 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     const offsetX = clientPlayer.body.position.x - serverPlayer.body.position.x
     const offsetY = clientPlayer.body.position.y - serverPlayer.body.position.y
     const offsetAngle = clientPlayer.angle - serverPlayer.angle
-    const positionCorrectionCoeff =
-      200 - map(Math.max(Math.abs(offsetX), Math.abs(offsetY)), 0, 20, 20, 100)
+    // const positionCorrectionCoeff =
+    //   70 - map(Math.max(Math.abs(offsetX), Math.abs(offsetY)), 0, 20, 10, 50)
+    const positionCorrectionCoeff = 10
     const angleCorrectionCoeff = 60
 
     // Apply a step by step correction of the player's position
@@ -261,42 +284,38 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   frameSync(interpolation: number) {
     this.syncPlayerByMeEngine()
 
-    const serverTime =
-      SnapshotInterpolation.Now() -
-      this.timeOffset -
-      this.snapshots.interpolationBuffer.get()
-    const shots = this.snapshots.vault.get(serverTime)
+    // const serverTime =
+    //   SnapshotInterpolation.Now() -
+    //   this.timeOffset -
+    //   this.snapshots.interpolationBuffer.get()
+    // const shots = this.snapshots.vault.get(serverTime)
 
-    if (!shots) return
+    // if (!shots) return
 
-    const { older, newer } = shots
+    // const { older, newer } = shots
 
-    if (!older || !newer) return
+    // if (!older || !newer) return
 
-    const playersSnapshot = this.snapshots.interpolate(
-      older,
-      newer,
-      interpolation,
-      'positionX positionY angle(deg) velocityX velocityY',
-      'players'
-    )
-    const bulletsSnapshot = this.snapshots.interpolate(
-      older,
-      newer,
-      interpolation,
-      'positionX positionY',
-      'bullets'
-    )
+    // const playersSnapshot = this.snapshots.interpolate(
+    //   older,
+    //   newer,
+    //   interpolation,
+    //   'positionX positionY angle(deg) velocityX velocityY',
+    //   'players'
+    // )
+    // const bulletsSnapshot = this.snapshots.interpolate(
+    //   older,
+    //   newer,
+    //   interpolation,
+    //   'positionX positionY',
+    //   'bullets'
+    // )
 
-    const players = playersSnapshot?.state as
-      | Snapshot['state']['players']
-      | undefined
-    const bullets = bulletsSnapshot?.state as
-      | Snapshot['state']['bullets']
-      | undefined
+    // const players = snapshot?.state as Snapshot['state']['players'] | undefined
+    // const bullets = snapshot?.state as Snapshot['state']['bullets'] | undefined
 
-    players && restorePlayersFromSnapshot(this.engine, players)
-    bullets && restoreBulletsFromSnapshot(this.engine, bullets)
+    // players && restorePlayersFromSnapshot(this.engine, players)
+    // bullets && restoreBulletsFromSnapshot(this.engine, bullets)
   }
 
   handleInitRoom({ snapshot, playerId, frame }: InitEventMessage) {
@@ -317,10 +336,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
       // Server sends current channel's playerId in INIT event,
       // if player matches that ID, then set that player as local player
-      if (
-        playerId === serverPlayer.id &&
-        !MULTIPLAYER_SET_ALL_PLAYERS_AS_SERVER_CONTROLLED
-      ) {
+      if (playerId === serverPlayer.id) {
         const me = new Player({
           id: serverPlayer.id,
           position: { x: serverPlayer.positionX, y: serverPlayer.positionY },
@@ -384,8 +400,8 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     player.aliveState = serverPlayer.aliveState
     player.bullets = serverPlayer.bullets
     player.setServerControlled(true)
-    this.engine.game.world.players.set(player.id, player)
 
+    this.engine.game.world.addPlayer(player)
     this.eventEmitter.emit(ClientEngineEvents.PLAYER_JOIN, serverPlayer)
   }
 
@@ -422,6 +438,8 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
         playerId: bullet.playerId,
         positionX: bullet.body.position.x,
         positionY: bullet.body.position.y,
+        velocityX: bullet.body.velocity.x,
+        velocityY: bullet.body.velocity.y,
         angle: bullet.body.angle,
       })
     }
@@ -439,7 +457,9 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   handleSnapshotRecieve(snapshot: Snapshot) {
     this.snapshots.vault.add(snapshot)
     this.timeOffset = SnapshotInterpolation.Now() - snapshot.time
+  }
 
+  reconcileEngine() {
     const lastDashedMs = this.engine.game.me?.lastDashedMs || 0
     const hasFinishedDashing =
       lastDashedMs + Player.DASH_TIMEOUT_MS <= Engine.now()
@@ -596,6 +616,36 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       case ClientInputActionKeyCodes.SHOOT: {
         this.isHoldingShootButton = false
         break
+      }
+    }
+  }
+
+  onTouchStart(e: TouchEvent) {
+    for (const touch of e.touches) {
+      if (touch.clientX > window.innerWidth / 2) {
+        const justPressed = !this.keysPressed.has(
+          ClientInputActionKeyCodes.ROTATE
+        )
+
+        if (justPressed) {
+          this.handleRotateDoubleTap()
+        }
+
+        this.keysPressed.add(ClientInputActionKeyCodes.ROTATE)
+      } else {
+        this.keysPressed.add(ClientInputActionKeyCodes.SHOOT)
+      }
+    }
+  }
+
+  onTouchEnd(e: TouchEvent) {
+    for (const touch of e.changedTouches) {
+      if (touch.clientX > window.innerWidth / 2) {
+        this.keysPressed.delete(ClientInputActionKeyCodes.ROTATE)
+        this.handleRotateStop()
+      } else {
+        this.keysPressed.delete(ClientInputActionKeyCodes.SHOOT)
+        this.isHoldingShootButton = false
       }
     }
   }

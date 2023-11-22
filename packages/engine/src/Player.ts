@@ -41,6 +41,8 @@ class Player {
   public static BULLET_KNOCKBACK_FORCE = Player.VELOCITY_FORCE * 6
   public static BULLET_REPLENISH_TIMEOUT = 2000
   public static PLAYER_COLLISION_CATEGORY = 0x0010
+  public static BODY_MASS = 1
+  public static CRAFT_DESTROYED_BODY_MASS = 1
 
   id: string
   world: World
@@ -85,8 +87,6 @@ class Player {
     this.isBoosting = false
     this.isServerControlled = false
     this.shipSprite = shipSprite
-
-    Matter.World.addBody(this.world.instance, this.body)
   }
 
   public dash(): boolean {
@@ -237,6 +237,7 @@ class Player {
     Matter.Body.scale(this.body, scale, scale)
     Matter.Body.set(this.body, {
       restitution: Player.CRAFT_DESTROYED_BODY_RESTITUTION,
+      mass: Player.CRAFT_DESTROYED_BODY_MASS,
     })
   }
 
@@ -266,10 +267,11 @@ class Player {
 
   public static createBody(position: Matter.Vector): Matter.Body {
     return Matter.Bodies.circle(position.x, position.y, Player.HITBOX_RADIUS, {
-      friction: 0,
       frictionAir: Player.BODY_FRICTION_AIR,
+      restitution: Player.BODY_RESTITUTION,
+      mass: Player.BODY_MASS,
+      friction: 0,
       angularVelocity: 0,
-      restitution: 0,
       collisionFilter: {
         category: Player.PLAYER_COLLISION_CATEGORY,
       },

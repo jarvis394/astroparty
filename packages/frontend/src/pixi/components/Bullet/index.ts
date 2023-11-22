@@ -1,4 +1,3 @@
-import Matter from 'matter-js'
 import * as PIXI from 'pixi.js'
 import { Assets } from 'pixi.js'
 import { Bullet as EngineBullet } from '@astroparty/engine'
@@ -6,12 +5,10 @@ import { lerp } from '@astroparty/shared/utils'
 
 class Bullet extends PIXI.Sprite {
   engineBullet: EngineBullet
-  previousPosition: Matter.Vector
 
   constructor(engineBullet: EngineBullet) {
     super(Assets.get('bullet'))
     this.engineBullet = engineBullet
-    this.previousPosition = engineBullet.body.position
     this.scale.set(2)
     this.rotation = engineBullet.body.angle
     this.anchor.set(0.5)

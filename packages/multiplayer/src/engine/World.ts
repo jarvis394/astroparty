@@ -1,4 +1,4 @@
-import { World } from '@astroparty/engine'
+import { AttractionSphere, World } from '@astroparty/engine'
 import Matter from 'matter-js'
 import ServerPlayer from './Player'
 import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
@@ -16,7 +16,13 @@ class ServerWorld extends World {
 			Matter.Vector.create(100, World.WORLD_HEIGHT - 100),
 		]
 		const shipSprites = [ShipSprite.BLUE, ShipSprite.RED, ShipSprite.PURPLE, ShipSprite.GREEN]
-		const n = this.players.size % spawnPositions.length
+		const n =
+			Number(
+				id
+					.split('')
+					.map((a) => a.charCodeAt(0))
+					.join('')
+			) % spawnPositions.length
 
 		return new ServerPlayer({
 			id,
