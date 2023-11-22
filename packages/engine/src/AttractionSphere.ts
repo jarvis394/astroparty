@@ -1,11 +1,12 @@
 import Matter from 'matter-js'
 import World from './World'
 import MatterAttractors from './lib/matterAttractors'
+// import map from '@astroparty/shared/utils/map'
 
 class AttractionSphere {
   public static LABEL = 'attraction_sphere'
-  public static HITBOX_RADIUS = 32
-  public static MASS = 5000
+  public static HITBOX_RADIUS = 28
+  public static MASS = 1000
   body: Matter.Body
   world: World
 
@@ -23,9 +24,10 @@ class AttractionSphere {
       normal = Matter.Vector.normalise(bToA),
       magnitude =
         -MatterAttractors.Attractors.gravityConstant *
-        ((bodyA.mass * bodyB.mass) / distanceSq),
+        ((bodyA.mass * bodyB.inverseMass) / distanceSq),
       force = Matter.Vector.mult(normal, magnitude)
 
+    bodyB.torque = magnitude * 1000
     Matter.Body.applyForce(bodyB, bodyB.position, Matter.Vector.neg(force))
   }
 

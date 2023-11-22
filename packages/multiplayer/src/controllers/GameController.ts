@@ -129,7 +129,7 @@ class GameController {
 			return false
 		}
 
-		if (!localBulletId) {
+		if (localBulletId) {
 			channel.emit(
 				GameEvents.SHOOT_ACK,
 				{

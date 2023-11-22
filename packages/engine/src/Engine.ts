@@ -20,7 +20,13 @@ class Engine {
       gravity: Matter.Vector.create(0, 0),
       constraintIterations: 6,
       positionIterations: 16,
-      world: Matter.World.create({}),
+      world: Matter.World.create({
+        gravity: {
+          scale: 0.1,
+          x: 0,
+          y: 0,
+        },
+      }),
     })
     this.game = new Game({
       matterEngine: this.matterEngine,
@@ -28,6 +34,8 @@ class Engine {
     this.frame = 0
     this.frameTimestamp = this.getFrameTimestamp()
     this.lastDelta = 0
+
+    this.initMatterPlugins()
   }
 
   public addPlayer(player: Player): Player {
@@ -61,8 +69,6 @@ class Engine {
   }
 
   public start() {
-    this.initMatterPlugins()
-
     Loop.setSimulationTimestep(Engine.MIN_DELTA)
     Loop.setUpdate(this.update.bind(this)).start()
   }

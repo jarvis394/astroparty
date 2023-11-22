@@ -1,7 +1,9 @@
 import { Engine, World } from '@astroparty/engine'
+import { lerp } from '@astroparty/shared/utils'
 import Matter from 'matter-js'
 import { Viewport as PixiViewport } from 'pixi-viewport'
 import { DisplayObject } from 'pixi.js'
+import { MATTER_CANVAS_CONTAINER_ID } from 'src/components/App'
 import Application from 'src/pixi/Application'
 
 class Viewport {
@@ -10,6 +12,8 @@ class Viewport {
   root: PixiViewport
   viewportPosition: Matter.Vector
   viewportScale: number
+  matterRender?: Matter.Render
+  bounds: Matter.Bounds
 
   constructor(app: Application, engine: Engine) {
     this.app = app
@@ -32,6 +36,66 @@ class Viewport {
       screenWidth: window.innerWidth,
       screenHeight: window.innerHeight,
     })
+    this.bounds = Matter.Bounds.create([
+      { x: 0, y: 0 },
+      { x: window.innerWidth, y: 0 },
+      { x: window.innerWidth, y: window.innerHeight },
+      { x: 0, y: window.innerHeight },
+    ])
+
+    const canvas = document.getElementById(MATTER_CANVAS_CONTAINER_ID)
+
+    if (!canvas || !(canvas instanceof HTMLCanvasElement)) return
+
+    this.matterRender = Matter.Render.create({
+      engine: this.engine.matterEngine,
+      canvas: canvas,
+      bounds: this.bounds,
+      options: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        background: 'transparent',
+        wireframeBackground: 'transparent',
+        wireframes: true,
+        showStats: true,
+        showAngleIndicator: true,
+        showBounds: true,
+        showDebug: true,
+        showVelocity: true,
+      },
+    })
+
+    this.translateMatterRender()
+    Matter.Render.run(this.matterRender)
+  }
+
+  translateMatterRender() {
+    const scale = this.viewportScale
+
+    if (!this.matterRender) return
+
+    this.bounds = Matter.Bounds.create([
+      { x: 0, y: 0 },
+      {
+        x: window.innerWidth / scale,
+        y: 0,
+      },
+      {
+        x: window.innerWidth / scale,
+        y: window.innerHeight / scale,
+      },
+      {
+        x: 0,
+        y: window.innerHeight / scale,
+      },
+    ])
+
+    Matter.Bounds.translate(this.bounds, {
+      x: -this.root.position.x / scale,
+      y: -this.root.position.y / scale,
+    })
+
+    this.matterRender.bounds = this.bounds
   }
 
   init() {
@@ -42,18 +106,21 @@ class Viewport {
   fit() {
     const { x, y, scale } = this.getViewportDimensions()
 
-    this.viewportPosition = { x, y }
-    this.viewportScale = scale
+    this.viewportPosition = {
+      x: lerp(this.viewportPosition.x, x, 0.02),
+      y: lerp(this.viewportPosition.y, y, 0.02),
+    }
+    this.viewportScale = lerp(this.viewportScale, scale, 0.02)
 
     this.root.animate({
-      time: 280,
-      position: { x, y },
-      height: window.innerHeight,
-      width: window.innerWidth,
-      scale: scale,
+      time: 0,
+      position: this.viewportPosition,
+      scale: this.viewportScale,
       ease: 'linear',
       removeOnInterrupt: false,
     })
+
+    this.translateMatterRender()
   }
 
   getViewportDimensions() {

@@ -8,7 +8,8 @@ class Attractor extends PIXI.Sprite {
   constructor(engineAttractor: EngineAttractionSphere) {
     super(Assets.get('attractionSphere'))
     this.engineAttractor = engineAttractor
-    this.scale.set(2)
+    this.width = 56
+    this.height = 56
     this.rotation = engineAttractor.body.angle
     this.anchor.set(0.5)
     this.position.set(

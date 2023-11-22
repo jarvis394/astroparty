@@ -24,6 +24,8 @@ export type SnapshotBullet = {
   playerId: string
   positionX: number
   positionY: number
+  velocityX: number
+  velocityY: number
 }
 
 export interface Snapshot extends Types.Snapshot {
@@ -60,6 +62,8 @@ export const generateSnapshot = (engine: Engine): Snapshot => {
       id: bullet.id,
       positionX: bullet.body.position.x,
       positionY: bullet.body.position.y,
+      velocityX: bullet.body.velocity.x,
+      velocityY: bullet.body.velocity.y,
       angle: bullet.body.angle,
       playerId: bullet.playerId,
     })
@@ -126,7 +130,10 @@ export const restorePlayersFromSnapshot = (
       enginePlayer.body,
       Matter.Vector.create(snapshotPlayer.velocityX, snapshotPlayer.velocityY)
     )
-    Matter.Body.setAngle(enginePlayer.body, degreesToRadian(enginePlayer.angle))
+    Matter.Body.setAngle(
+      enginePlayer.body,
+      degreesToRadian(snapshotPlayer.angle)
+    )
     Matter.Body.setAngularVelocity(enginePlayer.body, 0)
     enginePlayer.angle = snapshotPlayer.angle
   })
@@ -177,6 +184,10 @@ export const restoreBulletsFromSnapshot = (
       Matter.Vector.create(snapshotBullet.positionX, snapshotBullet.positionY)
     )
     Matter.Body.setAngle(engineBullet.body, snapshotBullet.angle)
+    Matter.Body.setVelocity(engineBullet.body, {
+      x: snapshotBullet.velocityX,
+      y: snapshotBullet.velocityY,
+    })
   })
 
   for (const engineBullet of engine.game.world.getAllBulletsIterator()) {

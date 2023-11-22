@@ -38,6 +38,11 @@ class Bullet {
     this.body.label = Bullet.getLabelFromId(id)
     this.isServerControlled = false
     this.isAcknowledgedByServer = false
+
+    Matter.Body.setVelocity(
+      this.body,
+      Matter.Vector.mult(getAngleVector(this.body), Bullet.VELOCITY)
+    )
   }
 
   public setId(id: Bullet['id']) {
@@ -48,14 +53,7 @@ class Bullet {
   public update() {
     if (this.isServerControlled) return
 
-    this.forward()
-  }
-
-  private forward() {
-    Matter.Body.setVelocity(
-      this.body,
-      Matter.Vector.mult(getAngleVector(this.body), Bullet.VELOCITY)
-    )
+    // TODO: apply some logic maybe
   }
 
   public setServerControlled(state: boolean) {
@@ -88,11 +86,10 @@ class Bullet {
 
     return Matter.Bodies.circle(position.x, position.y, Bullet.RADIUS, {
       friction: 0,
-      angularVelocity: 0,
       frictionStatic: 0,
       frictionAir: 0,
-      restitution: 1,
-      mass: 10,
+      restitution: 0,
+      mass: 0.3,
       isSensor: true,
       angle: angle,
     })

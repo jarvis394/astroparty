@@ -30,7 +30,7 @@ class MainScene extends PIXIObject {
     this.playerId = params.get('id')
     this.clientEngine = new ClientEngine(engine, this.playerId)
     this.viewport = new Viewport(app, engine)
-    this.debug = new Debug(this.clientEngine)
+    this.debug = new Debug(this.clientEngine, this.viewport)
 
     for (const player of this.clientEngine.engine.game.world.getAllPlayersIterator()) {
       const pixiPlayer = new Player(player)
@@ -47,7 +47,7 @@ class MainScene extends PIXIObject {
     for (const attractor of this.clientEngine.engine.game.world.attractors) {
       const pixiAttractor = new Attractor(attractor)
       this.attractors.push(pixiAttractor)
-      this.addChild(pixiAttractor)
+      this.viewport.addChild(pixiAttractor)
     }
 
     this.clientEngine.engine.game.world.addEventListener(
@@ -220,12 +220,15 @@ class MainScene extends PIXIObject {
     this.players.forEach((player) => {
       player.update(interpolation)
     })
+
     this.bullets.forEach((bullet) => {
       bullet.update()
     })
+
     this.attractors.forEach((attractor) => {
       attractor.update(interpolation)
     })
+
     this.debug.update()
 
     this.viewport.fit()

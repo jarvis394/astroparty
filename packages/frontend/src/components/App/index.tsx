@@ -5,8 +5,6 @@ import ScenesController from 'src/pixi/ScenesController'
 import { SCENES } from 'src/pixi/scenes'
 import { loadAssets } from 'src/assets'
 import useMountEffect from 'src/hooks/useMountEffect'
-import MatterRender from '../MatterRender'
-import Matter from 'matter-js'
 
 export const PIXI_CANVAS_CONTAINER_ID = 'pixi-container'
 export const MATTER_CANVAS_CONTAINER_ID = 'matter-container'
@@ -14,9 +12,6 @@ export const MATTER_CANVAS_CONTAINER_ID = 'matter-container'
 const App: React.FC = () => {
   const canvasContainer = useRef<HTMLDivElement>(null)
   const engine = useRef(new Engine())
-  const render = useRef(
-    Matter.Render.create({ engine: engine.current.matterEngine })
-  )
 
   useMountEffect(() => {
     const app = new Application(canvasContainer.current)
@@ -25,7 +20,6 @@ const App: React.FC = () => {
     const start = async () => {
       await loadAssets()
       await scenesController.loadScene(SCENES.MainScene)
-      Matter.Render.run(render.current)
     }
 
     start()
@@ -49,7 +43,17 @@ const App: React.FC = () => {
         Fullscreen
       </button>
       <div id={PIXI_CANVAS_CONTAINER_ID} ref={canvasContainer} />
-      <MatterRender render={render.current} />
+      <canvas
+        id={MATTER_CANVAS_CONTAINER_ID}
+        style={{
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          overflow: 'hidden',
+        }}
+      />
     </>
   )
 }
