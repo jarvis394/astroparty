@@ -88,7 +88,9 @@ class GameRoom extends EventEmitter<GameRoomEmitterEvents> {
 		const snapshot = generateSnapshot(this.game.engine)
 		const snapshotPlayer = snapshot.state.players.find((e) => e.id === playerId)
 
-		channel.emit(GameEvents.INIT, { snapshot, playerId, frame: this.game.engine.frame })
+		addLatencyAndPackagesLoss(() => {
+			channel.emit(GameEvents.INIT, { snapshot, playerId, frame: this.game.engine.frame })
+		})
 
 		this.channels.forEach((broadcastChannel) => {
 			// Skip just joined player

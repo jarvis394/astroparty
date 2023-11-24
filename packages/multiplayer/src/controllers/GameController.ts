@@ -90,11 +90,11 @@ class GameController {
 		switch (message.action) {
 			case 'start':
 				player.isRotating = true
-				channel.emit(GameEvents.ROTATE_START_ACK)
+				channel.emit(GameEvents.ROTATE_START_ACK, { frame: message.frame })
 				break
 			case 'stop':
 				player.isRotating = false
-				channel.emit(GameEvents.ROTATE_END_ACK)
+				channel.emit(GameEvents.ROTATE_END_ACK, { frame: message.frame })
 				break
 			default:
 				return console.error(`rotate message from ${playerId} is incorrect, got "${message}"`)

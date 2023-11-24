@@ -8,12 +8,13 @@ class ServerEngine extends Engine {
 	constructor() {
 		super()
 		this.game = new ServerGame({ matterEngine: this.matterEngine })
+		this.frame = 500
 	}
 
-  public createPlayer(id: string): ServerPlayer {
-    const player = this.game.world.createPlayer(id)
-    return player
-  }
+	public createPlayer(id: string): ServerPlayer {
+		const player = this.game.world.createPlayer(id)
+		return player
+	}
 }
 
 export default ServerEngine

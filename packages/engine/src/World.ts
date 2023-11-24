@@ -43,14 +43,14 @@ class World extends EventEmitter<WorldEmitterEvents> {
     this.walls = this.addWorldWalls()
     this.addObstacles()
     this.attractors = [
-      new AttractionSphere(
-        { x: World.WORLD_WIDTH / 4, y: World.WORLD_HEIGHT / 2 },
-        this
-      ),
-      new AttractionSphere(
-        { x: (World.WORLD_WIDTH / 4) * 3, y: World.WORLD_HEIGHT / 2 },
-        this
-      ),
+      // new AttractionSphere(
+      //   { x: World.WORLD_WIDTH / 4, y: World.WORLD_HEIGHT / 2 },
+      //   this
+      // ),
+      // new AttractionSphere(
+      //   { x: (World.WORLD_WIDTH / 4) * 3, y: World.WORLD_HEIGHT / 2 },
+      //   this
+      // ),
     ]
 
     Matter.Events.on(matterEngine, 'collisionStart', (event) => {

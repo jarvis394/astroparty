@@ -118,6 +118,14 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
       this.channel.on(GameEvents.PLAYER_LEFT, (message) => {
         this.handlePlayerLeft(message as PlayerLeftEventMessage)
       })
+      this.channel.on(GameEvents.ROTATE_START_ACK, (message) => {
+        console.log(message)
+        this.reconcilePlayer()
+      })
+      this.channel.on(GameEvents.ROTATE_END_ACK, (message) => {
+        console.log(message)
+        this.reconcilePlayer()
+      })
     })
   }
 
@@ -138,7 +146,6 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     bullets && restoreBulletsFromSnapshot(this.engine, bullets)
 
     this.mePlayerEngine.update(Engine.MIN_DELTA)
-    this.reconcileEngine()
 
     const snapshot = this.generateSnapshotForClientEngine()
     if (snapshot) {
@@ -155,6 +162,7 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     if (!engineBullet || !enginePlayer) return
 
     engineBullet.setId(message.serverBulletId)
+    engineBullet.setServerControlled(true)
     engineBullet.isAcknowledgedByServer = true
     enginePlayer.bullets = message.playerBulletsAmount
   }
@@ -258,16 +266,24 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
   syncPlayerByMeEngine() {
     const clientPlayer = this.engine.game.me
-    const serverPlayer = this.mePlayerEngine.game.me
+    // const reconciledPlayer = this.mePlayerEngine.game.me
+    const latestSnapshot = this.snapshots.vault.get() as Snapshot | undefined
+    const reconciledPlayer = latestSnapshot?.state.players.find(
+      (player) => player.id === this.playerId
+    )
 
-    if (!clientPlayer || !serverPlayer) return
+    if (!clientPlayer || !reconciledPlayer) return
 
-    const offsetX = clientPlayer.body.position.x - serverPlayer.body.position.x
-    const offsetY = clientPlayer.body.position.y - serverPlayer.body.position.y
-    const offsetAngle = clientPlayer.angle - serverPlayer.angle
+    // const offsetX =
+    //   clientPlayer.body.position.x - reconciledPlayer.body.position.x
+    // const offsetY =
+    //   clientPlayer.body.position.y - reconciledPlayer.body.position.y
+    const offsetX = clientPlayer.body.position.x - reconciledPlayer.positionX
+    const offsetY = clientPlayer.body.position.y - reconciledPlayer.positionY
+    const offsetAngle = clientPlayer.angle - reconciledPlayer.angle
     // const positionCorrectionCoeff =
     //   70 - map(Math.max(Math.abs(offsetX), Math.abs(offsetY)), 0, 20, 10, 50)
-    const positionCorrectionCoeff = 10
+    const positionCorrectionCoeff = 60
     const angleCorrectionCoeff = 60
 
     // Apply a step by step correction of the player's position
@@ -283,19 +299,14 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
 
   frameSync(interpolation: number) {
     this.syncPlayerByMeEngine()
-
     // const serverTime =
     //   SnapshotInterpolation.Now() -
     //   this.timeOffset -
     //   this.snapshots.interpolationBuffer.get()
     // const shots = this.snapshots.vault.get(serverTime)
-
     // if (!shots) return
-
     // const { older, newer } = shots
-
     // if (!older || !newer) return
-
     // const playersSnapshot = this.snapshots.interpolate(
     //   older,
     //   newer,
@@ -310,10 +321,12 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
     //   'positionX positionY',
     //   'bullets'
     // )
-
-    // const players = snapshot?.state as Snapshot['state']['players'] | undefined
-    // const bullets = snapshot?.state as Snapshot['state']['bullets'] | undefined
-
+    // const players = playersSnapshot?.state as
+    //   | Snapshot['state']['players']
+    //   | undefined
+    // const bullets = bulletsSnapshot?.state as
+    //   | Snapshot['state']['bullets']
+    //   | undefined
     // players && restorePlayersFromSnapshot(this.engine, players)
     // bullets && restoreBulletsFromSnapshot(this.engine, bullets)
   }
@@ -455,12 +468,21 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
   }
 
   handleSnapshotRecieve(snapshot: Snapshot) {
+    if (this.snapshots.vault.size === 0) {
+      restoreEngineFromSnapshot(this.mePlayerEngine, snapshot)
+      restoreEngineFromSnapshot(this.engine, snapshot)
+    }
+
     this.snapshots.vault.add(snapshot)
     this.timeOffset = SnapshotInterpolation.Now() - snapshot.time
+    // this.mePlayerEngine.game.me?.setLatency(this.timeOffset)
+    // this.engine.game.me?.setLatency(this.timeOffset)
+
+    this.reconcileEngine()
   }
 
   reconcileEngine() {
-    const lastDashedMs = this.engine.game.me?.lastDashedMs || 0
+    const lastDashedMs = this.mePlayerEngine.game.me?.lastDashedMs || 0
     const hasFinishedDashing =
       lastDashedMs + Player.DASH_TIMEOUT_MS <= Engine.now()
 
@@ -470,9 +492,9 @@ export class ClientEngine extends EventEmitter<ClientEngineEmitterEvents> {
      * TODO: need to fix `reconcilePlayer()` function as it does some weird stuff
      * TODO: when executed multiple times and an event is being replayed in `mePlayerEngine`
      */
-    if (hasFinishedDashing) {
-      this.reconcilePlayer()
-    }
+    // if (hasFinishedDashing) {
+    //   this.reconcilePlayer()
+    // }
   }
 
   handleRotateStart() {

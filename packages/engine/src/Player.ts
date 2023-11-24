@@ -5,6 +5,7 @@ import { ShipSprite } from '@astroparty/shared/types/ShipSprite'
 import Bullet from './Bullet'
 import getAngleVector from './utils/getAngleVector'
 import Engine from './Engine'
+import map from '@astroparty/shared/utils/map'
 
 export enum AliveState {
   ALIVE,
@@ -69,6 +70,7 @@ class Player {
   /** Флаг для состояния, когда игрок обновляется по данным с сервера */
   isServerControlled: boolean
   shipSprite: ShipSprite
+  latency: number
   private _aliveState: AliveState
 
   constructor({ id, position, shipSprite, world }: PlayerConstructorProps) {
@@ -87,6 +89,7 @@ class Player {
     this.isBoosting = false
     this.isServerControlled = false
     this.shipSprite = shipSprite
+    this.latency = 0
   }
 
   public dash(): boolean {
@@ -185,6 +188,10 @@ class Player {
     this.isServerControlled = state
   }
 
+  public setLatency(latency: number) {
+    this.latency = latency
+  }
+
   public update() {
     if (this.isServerControlled) return
 
@@ -199,10 +206,13 @@ class Player {
       return
 
     if (this.body.speed < Player.VELOCITY) {
+      const force =
+        Player.VELOCITY_FORCE * (1 - map(this.latency, 0, 100, 0, 0.5))
+
       Matter.Body.applyForce(
         this.body,
         this.body.position,
-        Matter.Vector.mult(getAngleVector(this.body), Player.VELOCITY_FORCE)
+        Matter.Vector.mult(getAngleVector(this.body), force)
       )
     }
   }
